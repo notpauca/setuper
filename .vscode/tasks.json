@@ -1,0 +1,34 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "C/C++: clang++ build active file",
+			"command": "/usr/bin/clang++",
+			"args": [
+				"--std=c++17",
+				"-fcolor-diagnostics",
+				"-fansi-escape-codes",
+				"-L${workspaceFolder}/lib", 
+				"-I${workspaceFolder}/include/", 
+				"-lcurl",
+				"${workspaceFolder}/src/*.cpp",
+				"-o",
+				"${workspaceFolder}/bin/setuper", 
+				"-Wall", 
+				"-g"
+			],
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "compiles the files with clang++"
+		},
+	]
+}
