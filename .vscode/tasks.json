@@ -9,13 +9,14 @@
 				"--std=c++17",
 				"-fcolor-diagnostics",
 				"-fansi-escape-codes",
-				"-L${workspaceFolder}/lib", 
-				"-I${workspaceFolder}/include/", 
+				"--library-directory=${workspaceFolder}/lib/",
+				"--include-directory=${workspaceFolder}/Include/",
 				"-lcurl",
-				"${workspaceFolder}/src/*.cpp",
+				"-lz",
+				"-lbz2",
+				"${workspaceFolder}/src/main.cpp",
 				"-o",
-				"${workspaceFolder}/bin/setuper", 
-				"-Wall", 
+				"${workspaceFolder}/bin/setuper",
 				"-g"
 			],
 			"options": {
@@ -29,6 +30,6 @@
 				"isDefault": true
 			},
 			"detail": "compiles the files with clang++"
-		},
+		}
 	]
 }
