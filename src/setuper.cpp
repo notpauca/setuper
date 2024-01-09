@@ -1,8 +1,7 @@
 #include <iostream>
 #include <curl/curl.h>
-#include <fstream>
 #include <sys/stat.h>
-#include "OpenDMG.cpp"
+#include "OpenDMG.hpp"
 
 const std::string Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36";
 
@@ -54,7 +53,7 @@ int makeDirectory(std::string directoryPath) {
 }
 
 struct ListEntry {
-    std::string name, address, bundleName; 
+    std::string name, address; 
 }; 
 
 std::vector<ListEntry> parseProgramList() {
@@ -79,11 +78,11 @@ int main() {
     std::vector<ListEntry> ProgramList = parseProgramList(); 
     
     FILE *DMG, *Output = NULL; 
-    std::string programpath, extractpath; 
+    std::string programPath, extractPath; 
     for (int i = 0; i != ProgramList.size(); i++ ) {
         std::string programpath = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
-        std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+"/"; 
-        // if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
+        std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
+        if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
         DMG = fopen(programpath.c_str(), "rb"); 
         Output = fopen(extractpath.c_str(), "wb"); 
         if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}
