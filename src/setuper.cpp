@@ -82,7 +82,7 @@ int main() {
     for (int i = 0; i != ProgramList.size(); i++ ) {
         std::string programpath = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
         std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
-        if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
+        // if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
         DMG = fopen(programpath.c_str(), "rb"); 
         Output = fopen(extractpath.c_str(), "wb"); 
         if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}

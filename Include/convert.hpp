@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream> 
 
 int convert_int(int i); 

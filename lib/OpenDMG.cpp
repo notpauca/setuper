@@ -1,9 +1,9 @@
 #include "OpenDMG.hpp"
 
 _mishblk parseMISHBLOCK(_mishblk input) {
-	input.BlocksSignature = convert_int(input.BlocksSignature);
-	if (input.BlocksSignature != 0x6D697368) {errno = 22;}
-	input.InfoVersion = convert_int(input.InfoVersion);
+	input.Signature = convert_int(input.Signature);
+	if (input.Signature != 0x6D697368) {errno = EINVAL;}
+	input.Version = convert_int(input.Version);
 	input.FirstSectorNumber = convert_int64(input.FirstSectorNumber);
 	input.SectorCount = convert_int64(input.SectorCount);
 	input.DataStart = convert_int64(input.DataStart);
@@ -17,7 +17,7 @@ _mishblk parseMISHBLOCK(_mishblk input) {
 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 	input.Signature = convert_int(input.Signature);
-    if(input.Signature != 0x6b6f6c79) {errno = 22; }
+    if(input.Signature != 0x6b6f6c79) {errno = EINVAL; }
     input.Version = convert_int(input.Version);
     input.HeaderSize = convert_int(input.HeaderSize);
     input.Flags = convert_int(input.Flags);
@@ -42,13 +42,12 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 int readDMG(FILE* File, FILE* Output) {
 	char *plist, *blkx, *partname_begin, *partname_end, *data_end, *data_begin; 
 	Bytef *tmp, *otmp, *dtmp; 
-	unsigned long long total_written = 0;
     int partnum = 0, i = 0; 
 	unsigned int data_size = 0; 
 	z_stream z;
 	bz_stream bz; 
 	struct _mishblk *parts = NULL;
-	uint64_t out_offs = 0, out_size = 0, in_offs = 0, in_size = 0, in_offs_add = 0, add_offs = 0, to_read = 0, to_write = 0, chunk = 0;
+	uint64_t out_size, in_offs, in_size, in_offs_add, add_offs, to_read, to_write, chunk;
     _Kolyblck kolyblock; 
     fseek(File, -0x200, 2); 
     fread(&kolyblock, 0x200, 1, File);
@@ -75,7 +74,7 @@ int readDMG(FILE* File, FILE* Output) {
 			data_size = data_end - data_begin;
 			i = ++partnum;
 			parts = (struct _mishblk *)realloc(parts, (partnum + 1) * 0xD8);
-			if (!parts) {std::cerr << "nodalījumu mainīgais neeksistē, kautkas nav kārtībā! "; return -1;}
+			if (!parts) {return -1;}
             char *base64data = (char *)malloc(data_size + 1);
             base64data[data_size] = '\0';
             memcpy(base64data, data_begin, data_size);
@@ -87,9 +86,9 @@ int readDMG(FILE* File, FILE* Output) {
             parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
             memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
             free(base64data); 
-            char *partname_begin = strstr(data_begin, "<key>Name</key>");
-			partname_begin = strstr(partname_begin, "<key>Name</key>") + strlen("<key>Name</key>");
-            char *partname_end = strstr(partname_begin, "</string>");
+            partname_begin = strstr(data_begin, "<key>Name</key>");
+			partname_begin = strstr(partname_begin, "<key>Name</key>") + 15;
+            partname_end = strstr(partname_begin, "</string>");
             char partname[255] = ""; 
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
         }
@@ -107,153 +106,132 @@ int readDMG(FILE* File, FILE* Output) {
 			memcpy(&mishblk, 0, 0xD8);
 			memcpy(&mishblk, mish_begin, 0xCC);
             mishblk = parseMISHBLOCK(mishblk);
-            next_mishblk = 0xCC + 0x28 * mishblk.BlocksRunCount + 0x04;
-            int i = ++partnum;  
-            struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * sizeof(_mishblk));
-			if (!parts) {std::cerr << "nodalījumu mainīgais neeksistē, kautkas nav kārtībā! "; return -1;}
+            next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
+            i = ++partnum;  
+            struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
+			if (!parts) {return -1;}
             memcpy(&parts[i], &mishblk, 0xD8);
 			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
             memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
         }
     }
-    else {std::cerr << "DMG failā neatrodas bloku informācija, tādēļ tas ir sabojāts. "; return -1; }
+    else {std::cerr << "Nav Kolybloka "; return -1;}
 
-	char reserved[5] = "    ";
-	unsigned int block_type, dw_reserved; 
-	in_offs = add_offs = in_offs_add = kolyblock.DataForkOffset; 
-	tmp = (Bytef *) malloc(0x100000);
-	otmp = (Bytef *) malloc(0x100000);
-	dtmp = (Bytef *) malloc(0x100000);
+	unsigned int block_type; 
+	in_offs = in_offs_add = kolyblock.DataForkOffset; 
+	tmp = (Bytef *) malloc(CHUNKSIZE);
+	otmp = (Bytef *) malloc(CHUNKSIZE);
+	dtmp = (Bytef *) malloc(CHUNKSIZE);
 	z.zalloc = (alloc_func) 0;
 	z.zfree = (free_func) 0;
 	z.opaque = (voidpf) 0;
-	bz.bzalloc = NULL;
-	bz.bzfree = NULL;
-	bz.opaque = NULL;
 	int err = 0; 
 	unsigned int offset;
 	for (int i = 0; i < partnum && in_offs <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
-		offset = 0; 
+		offset = block_type = 0; 
 		add_offs = in_offs_add; 
-		block_type = 0; 
-		// unsigned long bi = 0; // ig it's binary. idk though. 
-		while (block_type != 0xffffffff && offset < parts[i].BlocksRunCount * 0x28) {
+		while (block_type != 0xffffffff && offset < parts[i].BlocksRunCount * 40) {
 			block_type = convert_char4((unsigned char *)parts[i].Data + offset);
-			dw_reserved = convert_char4((unsigned char *)parts[i].Data + offset + 4);
-			memcpy(&reserved, parts[i].Data + offset + 4, 4);
-			out_offs = convert_char8((unsigned char *)parts[i].Data + offset + 8) * 0x200;
-			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
+			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 512;
 			in_offs = convert_char8((unsigned char *)parts[i].Data + offset + 24);
 			in_size = convert_char8((unsigned char *)parts[i].Data + offset + 32);
 			if (block_type != 0xffffffff) {in_offs_add = add_offs + in_offs + in_size;}
-			if (block_type == 0x80000005) {			// zlib data
-				if (inflateInit(&z)) {std::cout << "kautkas nav kārtībā. Kas? idfk"; return -1; }
-				fseeko(File, in_offs + add_offs, 0);
-				to_read = in_size;
-				do {
-					if (!to_read)
-						break;
-					if (to_read > 0x100000)
-						chunk = 0x100000;
-					else
-						chunk = to_read;
-					z.avail_in = fread(tmp, 1, chunk, File);
-					if (!z.avail_in) {break;} 
-					to_read -= z.avail_in;
-					z.next_in = tmp;
-					do {
-						z.avail_out = CHUNKSIZE;
-						z.next_out = otmp;
-						int err = inflate(&z, Z_NO_FLUSH);
-						assert(err != Z_STREAM_ERROR);	/* state not clobbered */
-						switch (err) {
-						case 2:
-							err = -3;	/* and fall through */
-						case -3:
-						case -4: return 1;
-						}
-						to_write = CHUNKSIZE - z.avail_out;
-						fwrite(otmp, 1, to_write, Output); 
-						total_written += to_write;
-					} while (z.avail_out == 0);
-				} while (err != Z_STREAM_END);
-
-				(void)inflateEnd(&z);
-			} 
-			else if (block_type == 0x80000006) {	// bzlib2 data
-				fseeko(File, in_offs + add_offs, 0);
-				to_read = in_size;
-				do {
-					if (!to_read)
-						break;
-					if (to_read > CHUNKSIZE)
-						chunk = CHUNKSIZE;
-					else
-						chunk = to_read;
-					bz.avail_in = fread(tmp, 1, chunk, File);
-					if (bz.avail_in == 0)
-						break;
-					to_read -= bz.avail_in;
-					bz.next_in = (char *)tmp;
-					do {
-						bz.avail_out = CHUNKSIZE;
-						bz.next_out = (char *)otmp;
-						err = BZ2_bzDecompress(&bz);
-						to_write = CHUNKSIZE - bz.avail_out;
-						fwrite(otmp, 1, to_write, Output); 
-					} while (bz.avail_out == 0);
-				} while (err != BZ_STREAM_END);
-
-				(void)BZ2_bzDecompressEnd(&bz);
-			} 
-			else if (block_type == 0x80000004) {	// ADC data
-				fseeko(File, in_offs + add_offs, 0);
-				to_read = in_size;
-				while (to_read > 0) {
-					chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
-					to_write = fread(tmp, 1, chunk, File);
-					int bytes_written;
-					int read_from_input = adc_decompress(to_write, tmp, 0x100000, dtmp, &bytes_written);
-					fwrite(dtmp, 1, bytes_written, Output);
-					to_read -= read_from_input;
-				}
-			} 
-			else if (block_type == 0x00000001) {	// raw data
-				fseeko(File, in_offs + add_offs, 0);
-				to_read = in_size;
-				while (to_read > 0) {
-					if (to_read > CHUNKSIZE)
-						chunk = CHUNKSIZE;
-					else
-						chunk = to_read;
-					to_write = fread(tmp, 1, chunk, File);
-					fwrite(tmp, 1, chunk, Output);
-					to_read -= chunk;
-				}
-			} 
-			else if (block_type == 0x00000000 || block_type == 0x00000002) {	// Zero-fill or Ignored block
-				memset(tmp, 0, CHUNKSIZE);
-				to_write = out_size;
-				while (to_write > 0) {
-					if (to_write > CHUNKSIZE)
-						chunk = CHUNKSIZE;
-					else
-						chunk = to_write;
-					if (fwrite(tmp, 1, chunk, Output) != chunk) {
-						return 1; 
-					}
-					total_written += chunk;
-					to_write -= chunk;
-				}
+			else {	// pēdējais bloku ieraksts
+				if (!in_offs && partnum > i+1) {
+					if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {in_offs_add = kolyblock.DataForkOffset;}
+				} else {in_offs_add = kolyblock.DataForkOffset;}
 			}
-			else if (block_type == 0xffffffff) {	// last blxx entry
-				if (in_offs == 0 && partnum > i+1) {
-					if (convert_char8((unsigned char *)parts[i+1].Data + 24) != 0)
-						in_offs_add = kolyblock.DataForkOffset;
-				} else
-					in_offs_add = kolyblock.DataForkOffset;
-
+			switch (block_type) {
+				case 0x80000005: //zlib
+					if (inflateInit(&z)) {return -1; }
+					fseeko(File, in_offs + add_offs, 0);
+					to_read = in_size;
+					do {
+						if (!to_read)
+							break;
+						if (to_read > CHUNKSIZE)
+							chunk = CHUNKSIZE;
+						else
+							chunk = to_read;
+						z.avail_in = fread(tmp, 1, chunk, File);
+						if (!z.avail_in) {break;} 
+						to_read -= z.avail_in;
+						z.next_in = tmp;
+						do {
+							z.avail_out = CHUNKSIZE;
+							z.next_out = otmp;
+							err = inflate(&z, Z_NO_FLUSH);
+							if (err == -4) {return -1; }
+							to_write = CHUNKSIZE - z.avail_out;
+							fwrite(otmp, 1, to_write, Output); 
+						} while (!z.avail_out);
+					} while (err != Z_STREAM_END);
+					(void)inflateEnd(&z);
+					break; 
+				case 0x80000006: //bzlib2
+					fseeko(File, in_offs + add_offs, 0);
+					to_read = in_size;
+					do {
+						if (!to_read)
+							break;
+						if (to_read > CHUNKSIZE)
+							chunk = CHUNKSIZE;
+						else
+							chunk = to_read;
+						bz.avail_in = fread(tmp, 1, chunk, File);
+						if (!bz.avail_in)
+							break;
+						to_read -= bz.avail_in;
+						bz.next_in = (char *)tmp;
+						do {
+							bz.avail_out = CHUNKSIZE;
+							bz.next_out = (char *)otmp;
+							err = BZ2_bzDecompress(&bz);
+							to_write = CHUNKSIZE - bz.avail_out;
+							fwrite(otmp, 1, to_write, Output); 
+						} while (bz.avail_out == 0);
+					} while (err != BZ_STREAM_END);
+					(void)BZ2_bzDecompressEnd(&bz);
+					break; 
+				case 0x80000004: //ADC
+					fseeko(File, in_offs + add_offs, 0);
+					to_read = in_size;
+					while (to_read) {
+						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
+						to_write = fread(tmp, 1, chunk, File);
+						int bytes_written;
+						int read_from_input = adc_decompress(to_write, tmp, CHUNKSIZE, dtmp, &bytes_written);
+						fwrite(dtmp, 1, bytes_written, Output);
+						to_read -= read_from_input;
+					}
+					break; 
+				case 0x00000001: //nekompresēti
+					fseeko(File, in_offs + add_offs, 0);
+					to_read = in_size;
+					while (to_read > 0) {
+						if (to_read > CHUNKSIZE)
+							chunk = CHUNKSIZE;
+						else
+							chunk = to_read;
+						fread(tmp, 1, chunk, File);
+						fwrite(tmp, 1, chunk, Output);
+						to_read -= chunk;
+					}
+					break; 
+				case 0: case 0x00000002: //iet garām
+					memset(tmp, 0, CHUNKSIZE);
+					to_write = out_size;
+					while (to_write > 0) {
+						if (to_write > CHUNKSIZE)
+							chunk = CHUNKSIZE;
+						else
+							chunk = to_write;
+						if (fwrite(tmp, 1, chunk, Output) != chunk) {
+							return 1; 
+						}
+						to_write -= chunk;
+					}
 			}
 			offset += 0x28;
 		}
@@ -267,7 +245,6 @@ int readDMG(FILE* File, FILE* Output) {
 	for (int i = 0; i < partnum; i++) {
 		delete(parts[i].Data); 
 	}
-	partnum = 0; 
 	delete(parts); 
 	delete(plist); 
 	delete(blkx); 
