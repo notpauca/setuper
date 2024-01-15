@@ -7,6 +7,7 @@
 #include "base64.hpp"
 #include "adc.hpp"
 #include "convert.hpp"
+#include <zip.h>
 
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
