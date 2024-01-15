@@ -1,5 +1,5 @@
 Compiler = clang++
-CPPFLAGS = -O3 -Wall --std=c++17 --include-directory=Include/ --library-directory=lib/
+CPPFLAGS = -O3 -Wall --std=c++17 --include-directory=Include/ --library-directory=lib/ 
 
 build: 
 	mkdir bin

@@ -167,7 +167,7 @@ int readDMG(FILE* File, FILE* Output) {
 							fwrite(otmp, 1, to_write, Output); 
 						} while (!z.avail_out);
 					} while (err != Z_STREAM_END);
-					(void)inflateEnd(&z);
+					inflateEnd(&z);
 					break; 
 				case 0x80000006: //bzlib2
 					fseeko(File, in_offs + add_offs, 0);
