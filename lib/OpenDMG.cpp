@@ -170,7 +170,8 @@ int readDMG(FILE* File, FILE* Output) {
 					fseeko(File, in_offs + add_offs, 0);
 					to_read = in_size;
 					do {
-						if (!to_read) {break;}
+						if (!to_read)
+							break;
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						bz.avail_in = fread(tmp, 1, chunk, File);
 						if (!bz.avail_in)
@@ -183,9 +184,9 @@ int readDMG(FILE* File, FILE* Output) {
 							err = BZ2_bzDecompress(&bz);
 							to_write = CHUNKSIZE - bz.avail_out;
 							fwrite(otmp, 1, to_write, Output); 
-						} while (bz.avail_out == 0);
+						} while (!bz.avail_out);
 					} while (err != BZ_STREAM_END);
-					(void)BZ2_bzDecompressEnd(&bz);
+					BZ2_bzDecompressEnd(&bz);
 					break; 
 				case 0x80000004: //ADC
 					fseeko(File, in_offs + add_offs, 0);
@@ -193,7 +194,7 @@ int readDMG(FILE* File, FILE* Output) {
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						to_write = fread(tmp, 1, chunk, File);
-						int bytes_written; 
+						int bytes_written;      
 						int read_from_input = adc_decompress(to_write, tmp, CHUNKSIZE, dtmp, &bytes_written);
 						fwrite(dtmp, 1, bytes_written, Output);
 						to_read -= read_from_input;
@@ -202,18 +203,21 @@ int readDMG(FILE* File, FILE* Output) {
 				case 0x00000001: //nekompresēti
 					fseeko(File, in_offs + add_offs, 0);
 					to_read = in_size;
-					while (to_read > 0) {
+					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						fread(tmp, 1, chunk, File);
 						fwrite(tmp, 1, chunk, Output);
 						to_read -= chunk;
 					}
 					break; 
-				case 0: case 0x00000002: //iet garām
+				case 0x00000000: case 0x00000002: //iet garām
 					memset(tmp, 0, CHUNKSIZE);
 					to_write = out_size;
-					while (to_write > 0) {
-						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
+					while (to_write) {
+						if (to_write > CHUNKSIZE)
+							chunk = CHUNKSIZE;
+						else
+							chunk = to_write;
 						if (fwrite(tmp, 1, chunk, Output) != chunk) {
 							return 1; 
 						}
