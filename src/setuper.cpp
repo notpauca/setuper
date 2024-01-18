@@ -80,9 +80,10 @@ int main() {
     FILE *DMG, *Output = NULL; 
     std::string programPath, extractPath; 
     for (int i = 0; i != ProgramList.size(); i++ ) {
+        std::cout << "current program: " << ProgramList[i].name << "\n"; 
         std::string programpath = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
-        std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
-        // if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
+        std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+".iso"; 
+        if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
         DMG = fopen(programpath.c_str(), "rb"); 
         Output = fopen(extractpath.c_str(), "wb"); 
         if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}

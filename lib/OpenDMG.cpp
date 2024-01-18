@@ -54,15 +54,13 @@ int readDMG(FILE* File, FILE* Output) {
     kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {return -1; }
     if (kolyblock.XMLOffset && kolyblock.XMLLength) {
-		plist = (char *)malloc(kolyblock.XMLLength + 1);
-		plist[kolyblock.XMLLength] = '\0';
+		plist = (char *)malloc(kolyblock.XMLLength);
         fseeko(File, kolyblock.XMLOffset, 0);
-        fread(plist, kolyblock.XMLLength, 1, File);
+        fread(plist, kolyblock.XMLLength-1, 1, File);
         char *_blkx_begin = strstr(plist, "<key>blkx</key>");
         unsigned int blkx_size = strstr(_blkx_begin, "</array>") - _blkx_begin;
-		blkx = (char *)malloc(blkx_size + 1);
-        memcpy(blkx, _blkx_begin, blkx_size);
-        blkx[blkx_size] = '\0'; 
+		blkx = (char *)malloc(blkx_size);
+        memcpy(blkx, _blkx_begin, blkx_size-1);
 		data_begin = blkx; 
         while (true) {
             unsigned int tmplen; 
@@ -75,10 +73,9 @@ int readDMG(FILE* File, FILE* Output) {
 			i = ++partnum;
 			parts = (struct _mishblk *)realloc(parts, (partnum + 1) * 0xD8);
 			if (!parts) {return -1;}
-            char *base64data = (char *)malloc(data_size + 1);
-            base64data[data_size] = '\0';
-            memcpy(base64data, data_begin, data_size);
-            cleanup_base64(base64data, data_size); 
+            char *base64data = (char *)malloc(data_size);
+            memcpy(base64data, data_begin, data_size-1);
+            cleanup_base64(base64data, data_size-1); 
             decode_base64(base64data, strlen(base64data), base64data, &tmplen);
 			memset(&parts[i], 0, 0xD8);
 			memcpy(&parts[i], base64data, 0xCC);
@@ -87,10 +84,11 @@ int readDMG(FILE* File, FILE* Output) {
             memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
             free(base64data); 
             partname_begin = strstr(data_begin, "<key>Name</key>");
-			partname_begin = strstr(partname_begin, "<key>Name</key>") + 15;
+			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
             partname_end = strstr(partname_begin, "</string>");
-            char partname[255] = ""; 
+            char partname[partname_end - partname_begin]; 
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
+			std::cout << partname << "\n";
         }
     }
     else if (kolyblock.RsrcForkOffset != 0 && kolyblock.RsrcForkLength != 0) {
@@ -245,3 +243,5 @@ int readDMG(FILE* File, FILE* Output) {
 		fclose(Output);	
 	return 0; 
 }
+
+
