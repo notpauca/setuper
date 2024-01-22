@@ -1,7 +1,6 @@
 #include "convert.hpp"
 
-int convert_int(int i)
-{
+int convert_int(int i) {
 	int o;
 	char *p_i = (char *) &i;
 	char *p_o = (char *) &o;
@@ -12,8 +11,7 @@ int convert_int(int i)
 	return o;
 }
 
-uint64_t convert_int64(uint64_t i)
-{
+uint64_t convert_int64(uint64_t i) {
 	uint64_t o;
 	char *p_i = (char *) &i;
 	char *p_o = (char *) &o;
@@ -28,12 +26,10 @@ uint64_t convert_int64(uint64_t i)
 	return o;
 }
 
-uint32_t convert_char4(unsigned char *c)
-{
+uint32_t convert_char4(unsigned char *c) {
 	return (((uint32_t) c[0]) << 24) | (((uint32_t) c[1]) << 16) | (((uint32_t) c[2]) << 8) | ((uint32_t) c[3]);
 }
 
-uint64_t convert_char8(unsigned char *c)
-{
+uint64_t convert_char8(unsigned char *c) {
 	return ((uint64_t) convert_char4(c) << 32) | (convert_char4(c + 4));
 }

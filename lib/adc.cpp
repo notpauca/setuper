@@ -1,8 +1,7 @@
 #include "adc.hpp"
 
-int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned char *output, int *bytes_written)
-{
-	if (!in_size) {return 0;}
+int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned char *output, int *bytes_written) {
+	if (!in_size) {return 0; }
 	short output_full = false;
 	unsigned char *inp = input;
 	unsigned char *outp = output;
@@ -37,7 +36,8 @@ int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned c
 			else { 
 				for (i = 0; i < chunk_size; i++) { 
 					memcpy(outp, outp - offset - 1, 1); 
-					outp++;}
+					outp++; 
+				}
 				inp += 2;
 			}
 			break;
@@ -53,7 +53,8 @@ int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned c
 				memset(outp, *(outp - offset - 1), chunk_size);
 				outp += chunk_size;
 				inp += 3;
-			} else {
+			} 
+			else {
 				for (i = 0; i < chunk_size; i++) {
 					memcpy(outp, outp - offset - 1, 1);
 					outp++;
@@ -62,24 +63,19 @@ int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned c
 			}
 			break;
 		}
-		if (output_full)
-			break;
+		if (output_full) {break; }
 	}
 	*bytes_written = outp - output;
 	return inp - input;
 }
 
-char adc_chunk_type(char _byte)
-{
-	if (_byte & 0x80)
-		return 1;
-	if (_byte & 0x40)
-		return 3;
+char adc_chunk_type(char _byte) {
+	if (_byte & 0x80) {return 1; }
+	if (_byte & 0x40) {return 3; }
 	return 2;
 }
 
-int adc_chunk_size(char _byte)
-{
+int adc_chunk_size(char _byte) {
 	switch (adc_chunk_type(_byte)) {
 		case 1:
 			return (_byte & 0x7F) + 1;
@@ -91,8 +87,7 @@ int adc_chunk_size(char _byte)
 	return -1;
 }
 
-int adc_chunk_offset(unsigned char *chunk_start)
-{
+int adc_chunk_offset(unsigned char *chunk_start) {
 	unsigned char *c = chunk_start;
 	switch (adc_chunk_type(*c)) {
 		case 1:

@@ -2,8 +2,7 @@
 
 void cleanup_base64(char *inp, const unsigned int size) {
 	char *tinp1 = inp, *tinp2 = inp;
-	unsigned int i;
-	for (i = 0; i < size; i++) {
+	for (unsigned int i = 0; i < size; i++) {
 		if (((unsigned)*tinp2-'A' <= 25) || ((unsigned)*tinp2-'a' <= 25) || ((unsigned)*tinp2-'0' <= 9) || *tinp2 == '+' || *tinp2 == '/' || *tinp2 == '=') {
 			*tinp1++ = *tinp2++;
 		} 

@@ -131,7 +131,7 @@ int readDMG(FILE* File, FILE* Output) {
 		fflush(stdout); 
 		offset = block_type = 0; 
 		add_offs = in_offs_add; 
-		while (block_type != 0xffffffff && offset < parts[i].BlocksRunCount * 40) {
+		while (block_type != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
 			block_type = convert_char4((unsigned char *)parts[i].Data + offset);
 			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 512;
 			in_offs = convert_char8((unsigned char *)parts[i].Data + offset + 24);
@@ -211,7 +211,7 @@ int readDMG(FILE* File, FILE* Output) {
 						to_write -= chunk;
 					}
 					break; 
-				case 0xffffffff: //pēdējais bloks
+				case 0xFFFFFFFF: //pēdējais bloks
 					if (!in_offs && partnum > i + 1) {
 						if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {in_offs_add = kolyblock.DataForkOffset;}
 					} 
