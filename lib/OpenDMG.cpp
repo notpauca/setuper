@@ -55,7 +55,29 @@ int readDMG(FILE* File, FILE* Output) {
     fread(&kolyblock, 0x200, 1, File);
     kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {return -1; }
-    if (kolyblock.XMLOffset && kolyblock.XMLLength) {
+	if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
+        char* plist = (char *)malloc(kolyblock.RsrcForkLength);
+        fseeko(File, kolyblock.RsrcForkOffset, 2); 
+        fread(plist, kolyblock.RsrcForkLength, 1, File); 
+        struct _mishblk mishblk; 
+        int next_mishblk = 0; 
+        char *mish_begin = plist + 0x104; 
+        while (true) {
+            mish_begin += next_mishblk; 
+            if (mish_begin - plist + 0xCC > kolyblock.RsrcForkLength) {break; } 
+			memcpy(&mishblk, 0, 0xD8);
+			memcpy(&mishblk, mish_begin, 0xCC);
+            mishblk = parseMISHBLOCK(mishblk);
+            next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
+            i = ++partnum;  
+            struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
+			if (!parts) {return -1;}
+            memcpy(&parts[i], &mishblk, 0xD8);
+			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
+            memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
+        }
+    }
+    else if (kolyblock.XMLOffset && kolyblock.XMLLength) {
 		plist = (char *)malloc(kolyblock.XMLLength);
         fseeko(File, kolyblock.XMLOffset, 0);
         fread(plist, kolyblock.XMLLength, 1, File);
@@ -85,34 +107,12 @@ int readDMG(FILE* File, FILE* Output) {
             parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
             memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
             free(base64data); 
-            // partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
+			// partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
 			// partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
 			// partname_begin = strstr(partname_begin, "<string>");
-            // char partname[partname_end - partname_begin]; 
+			// char partname[partname_end - partname_begin]; 
 			// memcpy(partname, partname_begin, partname_end - partname_begin); 
-			// std::cout << partname << i << "\n";
-        }
-    }
-    else if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
-        char* plist = (char *)malloc(kolyblock.RsrcForkLength);
-        fseeko(File, kolyblock.RsrcForkOffset, 2); 
-        fread(plist, kolyblock.RsrcForkLength, 1, File); 
-        struct _mishblk mishblk; 
-        int next_mishblk = 0; 
-        char *mish_begin = plist + 0x104; 
-        while (true) {
-            mish_begin += next_mishblk; 
-            if (mish_begin - plist + 0xCC > kolyblock.RsrcForkLength) {break; } 
-			memcpy(&mishblk, 0, 0xD8);
-			memcpy(&mishblk, mish_begin, 0xCC);
-            mishblk = parseMISHBLOCK(mishblk);
-            next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
-            i = ++partnum;  
-            struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
-			if (!parts) {return -1;}
-            memcpy(&parts[i], &mishblk, 0xD8);
-			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
-            memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
+			// std::cout << partname << i << "\n"; 
         }
     }
     else {return -1; }
