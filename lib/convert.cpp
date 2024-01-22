@@ -30,8 +30,7 @@ uint64_t convert_int64(uint64_t i)
 
 uint32_t convert_char4(unsigned char *c)
 {
-	return (((uint32_t) c[0]) << 24) | (((uint32_t) c[1]) << 16) |
-	(((uint32_t) c[2]) << 8) | ((uint32_t) c[3]);
+	return (((uint32_t) c[0]) << 24) | (((uint32_t) c[1]) << 16) | (((uint32_t) c[2]) << 8) | ((uint32_t) c[3]);
 }
 
 uint64_t convert_char8(unsigned char *c)
