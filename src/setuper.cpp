@@ -2,6 +2,7 @@
 #include <curl/curl.h>
 #include <sys/stat.h>
 #include "OpenDMG.hpp"
+#include "HFSOperations.h"
 
 const std::string Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36";
 
@@ -81,12 +82,15 @@ int main() {
     std::string programPath, extractPath; 
     for (int i = 0; i != ProgramList.size(); i++ ) {
         std::cout << "current program: " << ProgramList[i].name << "\n"; 
-        std::string programpath = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
-        std::string extractpath = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
-        // if (request(ProgramList[i].address, programpath)) {std::cerr << "can't make a request for application"+ProgramList[i].name; return 1;}
-        DMG = fopen(programpath.c_str(), "rb"); 
-        Output = fopen(extractpath.c_str(), "wb"); 
+        std::string dmgdir = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
+        std::string extractdir = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
+        std::string MountPath = "/tmp/Setuper/"+ProgramList[i].name+"/"; 
+        makeDirectory(MountPath); 
+        if (request(ProgramList[i].address, dmgdir)) {std::cerr << "can't make a request for application "+ProgramList[i].name; return 1;}
+        DMG = fopen(dmgdir.c_str(), "rb"); 
+        Output = fopen(extractdir.c_str(), "wb"); 
         if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}
+        MountHFS((char*)extractdir.c_str(), (char*)MountPath.c_str()); 
     }
     return 0; 
 }

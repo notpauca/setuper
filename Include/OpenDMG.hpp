@@ -7,7 +7,6 @@
 #include "base64.hpp"
 #include "adc.hpp"
 #include "convert.hpp"
-#include "cdio++/iso9660.hpp"
 
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
@@ -40,4 +39,4 @@ struct _mishblk {
 
 _mishblk parseMISHBLOCK(_mishblk input); 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input); 
-int readDMG(FILE* File, FILE* Output); 
+int readDMG(FILE* File, FILE* Output);  

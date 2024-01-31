@@ -42,9 +42,9 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 }
 
 int readDMG(FILE* File, FILE* Output) {
-	char *plist, *blkx, *data_end, *data_begin/*, *partname_begin, *partname_end*/; 
+	char *plist, *blkx, *data_end, *data_begin, *partname_begin, *partname_end; 
 	Bytef *tmp, *otmp, *dtmp; 
-    int partnum = 0, i = 0; 
+    int partnum = 0, i = 0, extractPart = 0; 
 	unsigned int data_size = 0; 
 	z_stream z;
 	bz_stream bz; 
@@ -107,16 +107,19 @@ int readDMG(FILE* File, FILE* Output) {
             parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
             memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
             free(base64data); 
-			// partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
-			// partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
-			// partname_begin = strstr(partname_begin, "<string>");
-			// char partname[partname_end - partname_begin]; 
-			// memcpy(partname, partname_begin, partname_end - partname_begin); 
-			// std::cout << partname << i << "\n"; 
+			partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
+			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
+			partname_begin = strstr(partname_begin, "<string>");
+			partname_end = strstr(partname_begin, "</string>"); 
+			char partname[partname_end - partname_begin]; 
+			memcpy(partname, partname_begin, partname_end - partname_begin); 
+			std::cout << partname << i << "\n"; 
+			if (strstr(partname, "HFS")) {extractPart = i;}
         }
     }
     else {return -1; }
 
+	std::cout << extractPart; 
 	unsigned int block_type; 
 	in_offs = in_offs_add = kolyblock.DataForkOffset; 
 	tmp = (Bytef *) malloc(CHUNKSIZE);
@@ -129,6 +132,7 @@ int readDMG(FILE* File, FILE* Output) {
 	unsigned int offset;
 	for (i = 0; i < partnum && in_offs <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
+		if (extractPart) {i = extractPart; }
 		offset = block_type = 0; 
 		add_offs = in_offs_add; 
 		while (block_type != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
@@ -220,6 +224,7 @@ int readDMG(FILE* File, FILE* Output) {
 			}
 			offset += 0x28;
 		}
+		if (extractPart) {break; }
 	}
     
 	#define delete(x) if(x) {free(x);}
