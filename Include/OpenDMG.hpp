@@ -2,11 +2,13 @@
 #include <fstream>
 #include <zlib.h>
 #include <bzlib.h>
+#include <lzfse.h>
 #include <iostream>
 #include <assert.h>
 #include "base64.hpp"
 #include "adc.hpp"
 #include "convert.hpp"
+
 
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
@@ -39,4 +41,4 @@ struct _mishblk {
 
 _mishblk parseMISHBLOCK(_mishblk input); 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input); 
-int readDMG(FILE* File, FILE* Output);  
+int readDMG(FILE* File, FILE* Output, int &mountable);  

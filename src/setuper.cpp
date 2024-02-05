@@ -79,10 +79,11 @@ std::vector<ListEntry> parseProgramList() {
 int main() {
     if (makeDirectory("/tmp/Setuper")) {return 1;}
     std::vector<ListEntry> ProgramList = parseProgramList(); 
-    
+    int mountable; 
     FILE *DMG, *Output = NULL; 
     std::string programPath, extractPath; 
     for (int i = 0; i != ProgramList.size(); i++ ) {
+        mountable = true; 
         std::cout << "current program: " << ProgramList[i].name << "\n"; 
         std::string dmg = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
         std::string extract = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
@@ -94,8 +95,10 @@ int main() {
         if (request(ProgramList[i].address, dmg)) {std::cerr << "can't make a request for application "+ProgramList[i].name << "\n"; return 1;}
         DMG = fopen(dmg.c_str(), "rb"); 
         Output = fopen(extract.c_str(), "wb"); 
-        if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}
-        MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)ProgramList[i].name.c_str()); 
+        if (readDMG(DMG, Output, mountable)) {std::cerr << "can't do jack shit, huh?"; return 1;}
+        if (mountable) {
+            MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)ProgramList[i].name.c_str()); 
+        }
     }
     return 0; 
 }

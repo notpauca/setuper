@@ -41,7 +41,7 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 	return input; 
 }
 
-int readDMG(FILE* File, FILE* Output) {
+int readDMG(FILE* File, FILE* Output, int &mountable) {
 	char *plist, *blkx, *data_end, *data_begin, *partname_begin, *partname_end; 
 	Bytef *tmp, *otmp, *dtmp; 
     int partnum = 0, i = 0, extractPart = 0; 
@@ -51,11 +51,13 @@ int readDMG(FILE* File, FILE* Output) {
 	struct _mishblk *parts = NULL;
 	uint64_t out_size, in_offs, in_size, in_offs_add, add_offs, to_read, to_write, chunk;
     _Kolyblck kolyblock; 
-	fseeko(File, 0, 0); 
+	size_t lzfse_outsize = 4 * CHUNKSIZE;
+	uint8_t *lzfse_out = NULL;
+	fseeko(File, 0, SEEK_SET); 
 	fread(&kolyblock, 0x200, 1, File);
 	kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {
-    	fseeko(File, -0x200, 2); 
+    	fseeko(File, -0x200, SEEK_END); 
 		fread(&kolyblock, 0x200, 1, File);
 		errno = 0; 
     	kolyblock = parseKOLYBLOCK(kolyblock); 
@@ -63,7 +65,7 @@ int readDMG(FILE* File, FILE* Output) {
 	}
 	if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
         char* plist = (char *)malloc(kolyblock.RsrcForkLength);
-        fseeko(File, kolyblock.RsrcForkOffset, 2); 
+        fseeko(File, kolyblock.RsrcForkOffset, SEEK_END); 
         fread(plist, kolyblock.RsrcForkLength, 1, File); 
         struct _mishblk mishblk; 
         int next_mishblk = 0; 
@@ -85,7 +87,7 @@ int readDMG(FILE* File, FILE* Output) {
     }
     else if (kolyblock.XMLOffset && kolyblock.XMLLength) {
 		plist = (char *)malloc(kolyblock.XMLLength);
-        fseeko(File, kolyblock.XMLOffset, 0);
+        fseeko(File, kolyblock.XMLOffset, SEEK_SET);
         fread(plist, kolyblock.XMLLength, 1, File);
         char *_blkx_begin = strstr(plist, "<key>blkx</key>");
         unsigned int blkx_size = strstr(_blkx_begin, "</array>") - _blkx_begin;
@@ -122,8 +124,9 @@ int readDMG(FILE* File, FILE* Output) {
 			if (strstr(partname, "HFS")) {extractPart = i;}
         }
     }
-    else {return -1; }
+    else {std::cout << "File may be corrupted, or it's just made with \"dd\" or something like that\nI don't know what to do here, so i'll just do nothing.\n"; return -1;}
 
+	if (!extractPart) {std::cout << "DMG file is either corrupt, or simply doesn't have any HFS partitions. as shrimple as that. \n"; mountable = false;}; 
 	unsigned int block_type; 
 	in_offs = in_offs_add = kolyblock.DataForkOffset; 
 	tmp = (Bytef *) malloc(CHUNKSIZE);
@@ -132,8 +135,13 @@ int readDMG(FILE* File, FILE* Output) {
 	z.zalloc = (alloc_func) 0;
 	z.zfree = (free_func) 0;
 	z.opaque = (voidpf) 0;
+	bz.bzalloc = NULL;
+	bz.bzfree = NULL;
+	bz.opaque = NULL;
 	int err; 
 	unsigned int offset;
+	lzfse_out = (uint8_t *) malloc(lzfse_outsize);
+	if (!lzfse_out) {return -1; }
 	for (i = 0; i < partnum && in_offs <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
 		if (extractPart) {i = extractPart; }
@@ -147,8 +155,8 @@ int readDMG(FILE* File, FILE* Output) {
 			in_offs_add = add_offs + in_offs + in_size;
 			switch (block_type) {
 				case 0x80000005: //zlib
-					if (inflateInit(&z)) {return -1; }
-					fseeko(File, in_offs + add_offs, 0);
+					inflateInit(&z);
+					fseeko(File, in_offs + add_offs, SEEK_SET);
 					to_read = in_size;
 					do {
 						if (!to_read) {break; }
@@ -169,7 +177,8 @@ int readDMG(FILE* File, FILE* Output) {
 					inflateEnd(&z);
 					break; 
 				case 0x80000006: //bzlib2
-					fseeko(File, in_offs + add_offs, 0);
+					BZ2_bzDecompressInit(&bz, 0, 0);
+					fseeko(File, in_offs + add_offs, SEEK_SET);
 					to_read = in_size;
 					do {
 						if (!to_read) {break; }
@@ -188,8 +197,24 @@ int readDMG(FILE* File, FILE* Output) {
 					} while (err != BZ_STREAM_END);
 					BZ2_bzDecompressEnd(&bz);
 					break; 
+
+				case 0x80000007: //LZFSE
+					fseeko(File, in_offs + add_offs, SEEK_SET);
+					to_read = fread(tmp, 1, to_read, File);
+					if (to_read) {
+						while (true) {
+							to_write = lzfse_decode_buffer(lzfse_out, lzfse_outsize, tmp, to_read, nullptr);
+							if (to_write == lzfse_outsize) {
+								lzfse_outsize <<= 1;
+								lzfse_out = (uint8_t *) realloc(lzfse_out, lzfse_outsize);
+							} 
+							else {break;}
+						}
+						fwrite(lzfse_out, 1, to_write, Output); 
+					}
+					break; 
 				case 0x80000004: //ADC
-					fseeko(File, in_offs + add_offs, 0);
+					fseeko(File, in_offs + add_offs, SEEK_SET);
 					to_read = in_size;
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
@@ -201,7 +226,7 @@ int readDMG(FILE* File, FILE* Output) {
 					}
 					break; 
 				case 0x00000001: //nekompresēti
-					fseeko(File, in_offs + add_offs, 0);
+					fseeko(File, in_offs + add_offs, SEEK_SET);
 					to_read = in_size;
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
@@ -233,6 +258,7 @@ int readDMG(FILE* File, FILE* Output) {
     
 	#define delete(x) if(x) {free(x);}
 
+	delete(lzfse_out);
 	delete(tmp); 
 	delete(otmp); 
 	delete(dtmp); 

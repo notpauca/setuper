@@ -314,6 +314,7 @@ int MountHFS(char* Filename, char* Mountpoint, char* MountName) {
 	
     hfs_volume vol; 
     if (hfslib_open_volume(cfg.device, 1, &vol, &(hfs_callback_args){ .openvol = &cfg.volume_config })) {return 1; }
+	printf("%s: file mounted!\n", Filename);
     fuse_main(args.argc, args.argv, &hfsfuse_ops, &vol);
 	return 0; 
 }
