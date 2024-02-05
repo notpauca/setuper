@@ -1,7 +1,7 @@
 Compiler = clang++ -std=gnu++11
 CCompiler = clang -std=gnu11
-FLAGS = -O3 -Wall -Wextra -pedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-unused-parameter -Wno-missing-field-initializers -Wno-missing-braces --include-directory=include/ --include-directory=/usr/local/include/ --library-directory=/usr/local/lib/ --library-directory=/opt/homebrew/lib/ --library-directory=lib/
-FUSEFLAGS = -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64 -DHAVE_OSBYTEORDER_H -DHAVE_BIRTHTIME -DHAVE_STAT_FLAGS -DHAVE_STAT_BLKSIZE -DHAVE_STAT_BLOCKS -DHAVE_VSYSLOG -DHAVE_PREAD -DUTF8PROC_EXPORTS -DHFSFUSE_VERSION_STRING=\"0.190-8b3cb2c\"
+FLAGS = -O3 -Wall -Wextra -pedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-unused-parameter -Wno-missing-field-initializers -Wno-missing-braces -Wno-unused-function --include-directory=include/ --include-directory=/usr/local/include/ --library-directory=/usr/local/lib/ --library-directory=/opt/homebrew/lib/ --library-directory=lib/
+FUSEFLAGS = -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64 -DHAVE_OSBYTEORDER_H -DHAVE_BIRTHTIME -DHAVE_STAT_FLAGS -DHAVE_STAT_BLKSIZE -DHAVE_STAT_BLOCKS -DHAVE_PREAD -DUTF8PROC_EXPORTS -DHFSFUSE_VERSION_STRING=\"0.190-8b3cb2c\"
 
 
 build: 

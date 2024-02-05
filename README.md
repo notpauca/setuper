@@ -1,7 +1,7 @@
 # Setuper
 ## Note: the code here isn't production-ready. And I don't give a **** if you've bricked your computer while using the code from this repo. 
 
-### A little program setup and install script for MacOS, made purely from love and C++!
+### A little program setup and install script for MacOS, made purely from love!
 
 ## Building
 To build, just: 

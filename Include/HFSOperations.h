@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <hfsuser.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -5,9 +7,12 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <fuse.h>
-#include <syslog.h>
 #include <ublio.h>
 #include <utf8proc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct hfsfuse_config {
 	struct hfs_volume_config volume_config;
@@ -65,10 +70,7 @@ static int hfsfuse_listxattr(const char* path, char* attr, size_t size);
 
 static int hfsfuse_getxattr_darwin(const char* path, const char* attr, char* value, size_t size, u_int32_t unused); 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-int MountHFS(char* Filename, char* Mountpoint); 
+int MountHFS(char* Filename, char* Mountpoint, char* Mountname); 
 #ifdef __cplusplus
 }
 #endif

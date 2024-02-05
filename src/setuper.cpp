@@ -1,8 +1,10 @@
 #include <iostream>
 #include <curl/curl.h>
 #include <sys/stat.h>
+#include <filesystem>
 #include "OpenDMG.hpp"
 #include "HFSOperations.h"
+#include <thread>
 
 const std::string Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36";
 
@@ -72,7 +74,7 @@ std::vector<ListEntry> parseProgramList() {
         }
     }
     return Res; 
-}
+}; 
 
 int main() {
     if (makeDirectory("/tmp/Setuper")) {return 1;}
@@ -82,16 +84,18 @@ int main() {
     std::string programPath, extractPath; 
     for (int i = 0; i != ProgramList.size(); i++ ) {
         std::cout << "current program: " << ProgramList[i].name << "\n"; 
-        std::string dmgdir = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
-        std::string extractdir = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
+        std::string dmg = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
+        std::string extract = "/tmp/Setuper/"+ProgramList[i].name+".img"; 
         std::string MountPath = "/tmp/Setuper/"+ProgramList[i].name+"/"; 
-        makeDirectory(MountPath); 
-        if (request(ProgramList[i].address, dmgdir)) {std::cerr << "can't make a request for application "+ProgramList[i].name; return 1;}
-        DMG = fopen(dmgdir.c_str(), "rb"); 
-        Output = fopen(extractdir.c_str(), "wb"); 
+        std::string CopyFrom = MountPath+ProgramList[i].name+".app"; 
+        std::string CopyTo = "/Applications/"+ProgramList[i].name+".app"; 
+        std::string ProgramPath = "/Applications/"+ProgramList[i].name; 
+        makeDirectory(MountPath);
+        if (request(ProgramList[i].address, dmg)) {std::cerr << "can't make a request for application "+ProgramList[i].name << "\n"; return 1;}
+        DMG = fopen(dmg.c_str(), "rb"); 
+        Output = fopen(extract.c_str(), "wb"); 
         if (readDMG(DMG, Output)) {std::cerr << "can't do jack shit, huh?"; return 1;}
-        MountHFS((char*)extractdir.c_str(), (char*)MountPath.c_str()); 
+        MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)ProgramList[i].name.c_str()); 
     }
     return 0; 
 }
-

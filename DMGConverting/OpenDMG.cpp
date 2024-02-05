@@ -51,10 +51,16 @@ int readDMG(FILE* File, FILE* Output) {
 	struct _mishblk *parts = NULL;
 	uint64_t out_size, in_offs, in_size, in_offs_add, add_offs, to_read, to_write, chunk;
     _Kolyblck kolyblock; 
-    fseek(File, -0x200, 2); 
-    fread(&kolyblock, 0x200, 1, File);
-    kolyblock = parseKOLYBLOCK(kolyblock); 
-	if (errno == EINVAL) {return -1; }
+	fseeko(File, 0, 0); 
+	fread(&kolyblock, 0x200, 1, File);
+	kolyblock = parseKOLYBLOCK(kolyblock); 
+	if (errno == EINVAL) {
+    	fseeko(File, -0x200, 2); 
+		fread(&kolyblock, 0x200, 1, File);
+		errno = 0; 
+    	kolyblock = parseKOLYBLOCK(kolyblock); 
+		if (errno == EINVAL) {std::cout << "rip\n"; return -1;}
+	}
 	if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
         char* plist = (char *)malloc(kolyblock.RsrcForkLength);
         fseeko(File, kolyblock.RsrcForkOffset, 2); 
@@ -113,13 +119,11 @@ int readDMG(FILE* File, FILE* Output) {
 			partname_end = strstr(partname_begin, "</string>"); 
 			char partname[partname_end - partname_begin]; 
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
-			std::cout << partname << i << "\n"; 
 			if (strstr(partname, "HFS")) {extractPart = i;}
         }
     }
     else {return -1; }
 
-	std::cout << extractPart; 
 	unsigned int block_type; 
 	in_offs = in_offs_add = kolyblock.DataForkOffset; 
 	tmp = (Bytef *) malloc(CHUNKSIZE);

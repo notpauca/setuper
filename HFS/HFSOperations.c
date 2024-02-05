@@ -1,6 +1,6 @@
 #include "HFSOperations.h"
 
-static struct fuse_operations hfsfuse_ops = {
+static _Thread_local struct fuse_operations hfsfuse_ops = {
 	.destroy     = hfsfuse_destroy,
 	.open        = hfsfuse_open,
 	.opendir     = hfsfuse_opendir,
@@ -241,23 +241,23 @@ static int hfsfuse_getxattr(const char* path, const char* attr, char* value, siz
 		});
 	}
 
-	// define_attr(attr, "hfsfuse.record.date_created", size, 24, {
-	// 	// some strftime implementations require room for the null terminator
-	// 	// but we don't want this in the returned attribute value
-	// 	char timebuf[25];
-	// 	struct tm t;
-	// 	localtime_r(&(time_t){HFSTIMETOEPOCH(rec.file.date_created)}, &t);
-	// 	strftime(timebuf, 25, "%FT%T%z", &t);
-	// 	memcpy(value, timebuf, 24);
-	// });
+	define_attr(attr, "hfsfuse.record.date_created", size, 24, {
+		// some strftime implementations require room for the null terminator
+		// but we don't want this in the returned attribute value
+		char timebuf[25];
+		struct tm t;
+		localtime_r(&(time_t){HFSTIMETOEPOCH(rec.file.date_created)}, &t);
+		strftime(timebuf, 25, "%FT%T%z", &t);
+		memcpy(value, timebuf, 24);
+	});
 
-	// define_attr(attr, "hfsfuse.record.date_backedup", size, 24, {
-	// 	char timebuf[25];
-	// 	struct tm t;
-	// 	localtime_r(&(time_t){HFSTIMETOEPOCH(rec.file.date_backedup)}, &t);
-	// 	strftime(timebuf, 25, "%FT%T%z", &t);
-	// 	memcpy(value, timebuf, 24);
-	// });
+	define_attr(attr, "hfsfuse.record.date_backedup", size, 24, {
+		char timebuf[25];
+		struct tm t;
+		localtime_r(&(time_t){HFSTIMETOEPOCH(rec.file.date_backedup)}, &t);
+		strftime(timebuf, 25, "%FT%T%z", &t);
+		memcpy(value, timebuf, 24);
+	});
 
 	return -ENOATTR;
 }
@@ -266,29 +266,48 @@ static int hfsfuse_getxattr_darwin(const char* path, const char* attr, char* val
 	return hfsfuse_getxattr(path, attr, value, size);
 }
 
+static int hfsfuse_opt_proc(void* data, const char* arg, int key, struct fuse_args* args) {
+	struct hfsfuse_config* cfg = data;
+	if(!cfg->device) {
+		cfg->device = strdup(arg);
+		return 0;
+	}
+	return 1; 
+}
 
-int MountHFS(char* Filename, char* Mountpoint) {
-	char* arguments[] = {Filename, Mountpoint}; 
+int MountHFS(char* Filename, char* Mountpoint, char* MountName) {
+	char* arguments[] = {"\0", Filename, Mountpoint}; 
 	struct fuse_args args = FUSE_ARGS_INIT(3, arguments); 
 
     struct hfsfuse_config cfg = {0};
 	hfs_volume_config_defaults(&cfg.volume_config);
+	cfg.force = 1; 
 
-    if (fuse_opt_parse(&args, &cfg, NULL, NULL) != -1 || cfg.volume_config.rsrc_suff && strchr(cfg.volume_config.rsrc_suff,'/')) {return 1; }
-    char* fsname = malloc(8 + strlen(cfg.device));
+    if(fuse_opt_parse(&args, &cfg, NULL, hfsfuse_opt_proc) == -1 || !cfg.device) {
+		fuse_opt_free_args(&args);
+		return 1;
+	}
+
+    char* fsname = malloc(8 + strlen(cfg.device)); 
+	if (!fsname) {return 1;}
 	strcpy(fsname, "fsname=");
 	strcat(fsname, cfg.device);
 
     char* opts = NULL;
 	fuse_opt_add_opt(&opts, "ro");
-	if(!cfg.noallow_other)
-		fuse_opt_add_opt(&opts, "allow_other");
+	// fuse_opt_add_opt(&opts, "local");
+	if(!cfg.noallow_other) {fuse_opt_add_opt(&opts, "allow_other");}
 	fuse_opt_add_opt(&opts, "use_ino");
 	fuse_opt_add_opt(&opts, "subtype=hfs");
+	char* mountname = malloc(9 + strlen(MountName)); 
+	strcpy(mountname, "volname="); 
+	strcat(mountname, MountName); 
+	fuse_opt_add_opt(&opts, mountname); 
 	fuse_opt_add_opt_escaped(&opts, fsname);
 	fuse_opt_add_arg(&args, "-o");
 	fuse_opt_add_arg(&args, opts);
 	fuse_opt_add_arg(&args, "-s");
+	fuse_opt_add_arg(&args, "-f");
 	free(fsname); 
 
 	hfslib_init(&(hfs_callbacks){hfs_vprintf, hfs_malloc, hfs_realloc, hfs_free, hfs_open, hfs_close, hfs_read});
@@ -296,4 +315,5 @@ int MountHFS(char* Filename, char* Mountpoint) {
     hfs_volume vol; 
     if (hfslib_open_volume(cfg.device, 1, &vol, &(hfs_callback_args){ .openvol = &cfg.volume_config })) {return 1; }
     fuse_main(args.argc, args.argv, &hfsfuse_ops, &vol);
+	return 0; 
 }
