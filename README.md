@@ -1,5 +1,6 @@
 # Setuper
-[!CAUTION]The code in this is more buggy than my mattress
+> [!CAUTION] 
+> The code in this repo is more buggy than my mattress
 
 ### A little program setup and install script for MacOS, made purely from love!
 
