@@ -31,36 +31,34 @@ int adc_decompress(int in_size, unsigned char *input, int avail_size, unsigned c
 			if (!offset) {
 				memset(outp, *(outp - offset - 1), chunk_size);
 				outp += chunk_size;
-				inp += 2;
 			} 
 			else { 
 				for (i = 0; i < chunk_size; i++) { 
 					memcpy(outp, outp - offset - 1, 1); 
 					outp++; 
 				}
-				inp += 2;
 			}
+			inp += 2;
 			break;
 
 		case 3:
 			chunk_size = adc_chunk_size(*inp);
 			offset = adc_chunk_offset(inp);
 			if (outp + chunk_size - output > avail_size) {
-				output_full = 1;
+				output_full = true;
 				break;
 			}
 			if (!offset) {
 				memset(outp, *(outp - offset - 1), chunk_size);
 				outp += chunk_size;
-				inp += 3;
 			} 
 			else {
 				for (i = 0; i < chunk_size; i++) {
 					memcpy(outp, outp - offset - 1, 1);
 					outp++;
 				}
-				inp += 3;
 			}
+			inp += 3;
 			break;
 		}
 		if (output_full) {break; }

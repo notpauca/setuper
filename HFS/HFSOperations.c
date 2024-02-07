@@ -276,6 +276,10 @@ static int hfsfuse_opt_proc(void* data, const char* arg, int key, struct fuse_ar
 }
 
 int MountHFS(char* Filename, char* Mountpoint, char* MountName) {
+	pid_t isParent = fork(); 
+	if (isParent) {
+		return 0; 
+	}
 	char* arguments[] = {"\0", Filename, Mountpoint}; 
 	struct fuse_args args = FUSE_ARGS_INIT(3, arguments); 
 
@@ -307,14 +311,12 @@ int MountHFS(char* Filename, char* Mountpoint, char* MountName) {
 	fuse_opt_add_arg(&args, "-o");
 	fuse_opt_add_arg(&args, opts);
 	fuse_opt_add_arg(&args, "-s");
-	fuse_opt_add_arg(&args, "-f");
 	free(fsname); 
 
 	hfslib_init(&(hfs_callbacks){hfs_vprintf, hfs_malloc, hfs_realloc, hfs_free, hfs_open, hfs_close, hfs_read});
 	
     hfs_volume vol; 
     if (hfslib_open_volume(cfg.device, 1, &vol, &(hfs_callback_args){ .openvol = &cfg.volume_config })) {return 1; }
-	printf("%s: file mounted!\n", Filename);
     fuse_main(args.argc, args.argv, &hfsfuse_ops, &vol);
-	return 0; 
+	exit(0);
 }

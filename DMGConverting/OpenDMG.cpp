@@ -55,6 +55,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 	uint8_t *lzfse_out = NULL;
 	fseeko(File, 0, SEEK_SET); 
 	fread(&kolyblock, 0x200, 1, File);
+	errno = 0; 
 	kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {
     	fseeko(File, -0x200, SEEK_END); 
@@ -124,14 +125,14 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 			if (strstr(partname, "HFS")) {extractPart = i;}
         }
     }
-    else {std::cout << "File may be corrupted, or it's just made with \"dd\" or something like that\nI don't know what to do here, so i'll just do nothing.\n"; return -1;}
+    else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
 
-	if (!extractPart) {std::cout << "DMG file is either corrupt, or simply doesn't have any HFS partitions. as shrimple as that. \n"; mountable = false;}; 
-	unsigned int block_type; 
+	if (!extractPart) {std::cout << "No HFS partitions, will not mount!\n"; mountable = false;}; 
+	unsigned int block_type, offset; 
 	in_offs = in_offs_add = kolyblock.DataForkOffset; 
-	tmp = (Bytef *) malloc(CHUNKSIZE);
-	otmp = (Bytef *) malloc(CHUNKSIZE);
-	dtmp = (Bytef *) malloc(CHUNKSIZE);
+	tmp = (Bytef *)malloc(CHUNKSIZE);
+	otmp = (Bytef *)malloc(CHUNKSIZE);
+	dtmp = (Bytef *)malloc(CHUNKSIZE);
 	z.zalloc = (alloc_func) 0;
 	z.zfree = (free_func) 0;
 	z.opaque = (voidpf) 0;
@@ -139,9 +140,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 	bz.bzfree = NULL;
 	bz.opaque = NULL;
 	int err; 
-	unsigned int offset;
-	lzfse_out = (uint8_t *) malloc(lzfse_outsize);
-	if (!lzfse_out) {return -1; }
+	lzfse_out = (uint8_t *)malloc(lzfse_outsize);
 	for (i = 0; i < partnum && in_offs <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
 		if (extractPart) {i = extractPart; }
@@ -149,7 +148,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 		add_offs = in_offs_add; 
 		while (block_type != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
 			block_type = convert_char4((unsigned char *)parts[i].Data + offset);
-			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 512;
+			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
 			in_offs = convert_char8((unsigned char *)parts[i].Data + offset + 24);
 			in_size = convert_char8((unsigned char *)parts[i].Data + offset + 32);
 			in_offs_add = add_offs + in_offs + in_size;
@@ -225,7 +224,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 						to_read -= read_from_input;
 					}
 					break; 
-				case 0x00000001: //nekompresēti
+				case 0x00000001: //uncompressed
 					fseeko(File, in_offs + add_offs, SEEK_SET);
 					to_read = in_size;
 					while (to_read) {
@@ -235,7 +234,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 						to_read -= chunk;
 					}
 					break; 
-				case 0x00000000: case 0x00000002: //iet garām
+				case 0x00000000: case 0x00000002: //ignore
 					memset(tmp, 0, CHUNKSIZE);
 					to_write = out_size;
 					while (to_write) {
@@ -244,11 +243,13 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 						to_write -= chunk;
 					}
 					break; 
-				case 0xFFFFFFFF: //pēdējais bloks
-					if (!in_offs && partnum > i + 1) {
-						if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {in_offs_add = kolyblock.DataForkOffset;}
-					} 
-					else {in_offs_add = kolyblock.DataForkOffset;}
+				case 0xFFFFFFFF: //pēdējais bloks§
+					if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {
+						in_offs_add = kolyblock.DataForkOffset;
+					}
+					else {
+						in_offs_add = kolyblock.DataForkOffset;
+					}
 					break; 
 			}
 			offset += 0x28;
@@ -256,18 +257,18 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 		if (extractPart) {break; }
 	}
     
-	#define delete(x) if(x) {free(x);}
+	#define del(x) if(x) {free(x);}
 
-	delete(lzfse_out);
-	delete(tmp); 
-	delete(otmp); 
-	delete(dtmp); 
+	del(lzfse_out);
+	del(tmp); 
+	del(otmp); 
+	del(dtmp); 
 	for (int i = 0; i < partnum; i++) {
-		delete(parts[i].Data); 
+		del(parts[i].Data); 
 	}
-	delete(parts); 
-	delete(plist); 
-	delete(blkx); 
+	del(parts); 
+	del(plist); 
+	del(blkx); 
 	if (File)
 		fclose(File);
 	if (Output)

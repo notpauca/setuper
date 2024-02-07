@@ -18,10 +18,7 @@ int request(std::string Address, std::string outputName) {
     curl_global_init(CURL_GLOBAL_ALL); 
     CURL* curl = curl_easy_init();
     FILE* filepointer = fopen(outputName.c_str(), "wb"); 
-    if (!curl) {
-        std::cerr << "Curl did not initialize."; 
-        return 1; 
-    } 
+    if (!curl) {return -1; } 
     curl_easy_setopt(curl, CURLOPT_URL, Address.c_str());
 
     struct curl_slist* headers = NULL; 
@@ -31,11 +28,7 @@ int request(std::string Address, std::string outputName) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, filepointer);
 
-    CURLcode res = curl_easy_perform(curl); 
-    if (res) {
-        std::cerr << curl_easy_strerror(res); 
-        return 1; 
-    }
+    if (curl_easy_perform(curl)) {return -1; }
     fclose(filepointer); 
     curl_easy_cleanup(curl); 
     curl = NULL; 
@@ -47,11 +40,10 @@ int makeDirectory(std::string directoryPath) {
     mkdir(directoryPath.c_str(), 0777); 
     switch (errno) {
         case 17:
-            return 0; 
         case 0: 
             return 0; 
         default:
-            return 1; 
+            return -1; 
     }; 
 }
 
@@ -82,7 +74,7 @@ int main() {
     int mountable; 
     FILE *DMG, *Output = NULL; 
     std::string programPath, extractPath; 
-    for (int i = 0; i != ProgramList.size(); i++ ) {
+    for (int i = 0; i != ProgramList.size(); i++) {
         mountable = true; 
         std::cout << "current program: " << ProgramList[i].name << "\n"; 
         std::string dmg = "/tmp/Setuper/"+ProgramList[i].name+".dmg"; 
@@ -90,12 +82,12 @@ int main() {
         std::string MountPath = "/tmp/Setuper/"+ProgramList[i].name+"/"; 
         std::string CopyFrom = MountPath+ProgramList[i].name+".app"; 
         std::string CopyTo = "/Applications/"+ProgramList[i].name+".app"; 
-        std::string ProgramPath = "/Applications/"+ProgramList[i].name; 
-        makeDirectory(MountPath);
-        if (request(ProgramList[i].address, dmg)) {std::cerr << "can't make a request for application "+ProgramList[i].name << "\n"; return 1;}
+        if (makeDirectory("/tmp/Setuper")) {return 1;}
+        // if (request(ProgramList[i].address, dmg)) {std::cerr << "can't make a request for application "+ProgramList[i].name << "\n"; return 1;}
         DMG = fopen(dmg.c_str(), "rb"); 
         Output = fopen(extract.c_str(), "wb"); 
         if (readDMG(DMG, Output, mountable)) {std::cerr << "can't do jack shit, huh?"; return 1;}
+        std::cout << "ok\n"; 
         if (mountable) {
             MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)ProgramList[i].name.c_str()); 
         }
