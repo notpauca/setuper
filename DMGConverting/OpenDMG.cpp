@@ -19,38 +19,38 @@ _mishblk parseMISHBLOCK(_mishblk input) {
 _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 	// input.Signature = convert_int(input.Signature);
 	// if(input.Signature != 0x6B6F6C79) {errno = EINVAL; }
-    if(input.Signature != 0x796C6F6B) {errno = EINVAL; }
-    // input.Version = convert_int(input.Version);
-    // input.HeaderSize = convert_int(input.HeaderSize);
-    // input.Flags = convert_int(input.Flags);
-    // input.RunningDataForkOffset = convert_int64(input.RunningDataForkOffset);
-    input.DataForkOffset = convert_int64(input.DataForkOffset);
-    input.DataForkLength = convert_int64(input.DataForkLength);
-    input.RsrcForkOffset = convert_int64(input.RsrcForkOffset);
-    input.RsrcForkLength = convert_int64(input.RsrcForkLength);
-    // input.SegmentNumber = convert_int(input.SegmentNumber);
-    // input.SegmentCount = convert_int(input.SegmentCount);
-    // input.DataForkChecksumType = convert_int(input.DataForkChecksumType);
-    // input.DataForkChecksum = convert_int(input.DataForkChecksum);
-    input.XMLOffset = convert_int64(input.XMLOffset);
-    input.XMLLength = convert_int64(input.XMLLength);
-    // input.MasterChecksumType = convert_int(input.MasterChecksumType);
-    // input.MasterChecksum = convert_int(input.MasterChecksum);
-    // input.ImageVariant = convert_int(input.ImageVariant);
-    // input.SectorCount = convert_int64(input.SectorCount);
+	if(input.Signature != 0x796C6F6B) {errno = EINVAL; }
+	// input.Version = convert_int(input.Version);
+	// input.HeaderSize = convert_int(input.HeaderSize);
+	// input.Flags = convert_int(input.Flags);
+	// input.RunningDataForkOffset = convert_int64(input.RunningDataForkOffset);
+	input.DataForkOffset = convert_int64(input.DataForkOffset);
+	input.DataForkLength = convert_int64(input.DataForkLength);
+	input.RsrcForkOffset = convert_int64(input.RsrcForkOffset);
+	input.RsrcForkLength = convert_int64(input.RsrcForkLength);
+	// input.SegmentNumber = convert_int(input.SegmentNumber);
+	// input.SegmentCount = convert_int(input.SegmentCount);
+	// input.DataForkChecksumType = convert_int(input.DataForkChecksumType);
+	// input.DataForkChecksum = convert_int(input.DataForkChecksum);
+	input.XMLOffset = convert_int64(input.XMLOffset);
+	input.XMLLength = convert_int64(input.XMLLength);
+	// input.MasterChecksumType = convert_int(input.MasterChecksumType);
+	// input.MasterChecksum = convert_int(input.MasterChecksum);
+	// input.ImageVariant = convert_int(input.ImageVariant);
+	// input.SectorCount = convert_int64(input.SectorCount);
 	return input; 
 }
 
 int readDMG(FILE* File, FILE* Output, int &mountable) {
 	char *plist, *blkx, *data_end, *data_begin, *partname_begin, *partname_end; 
 	Bytef *tmp, *otmp, *dtmp; 
-    int partnum = 0, i = 0, extractPart = 0; 
+	int partnum = 0, i = 0, extractPart = 0; 
 	unsigned int data_size = 0; 
 	z_stream z;
 	bz_stream bz; 
 	struct _mishblk *parts = NULL;
 	uint64_t out_size, in_offs, in_size, in_offs_add, add_offs, to_read, to_write, chunk;
-    _Kolyblck kolyblock; 
+	_Kolyblck kolyblock; 
 	size_t lzfse_outsize = 4 * CHUNKSIZE;
 	uint8_t *lzfse_out = NULL;
 	fseeko(File, 0, SEEK_SET); 
@@ -58,47 +58,47 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 	errno = 0; 
 	kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {
-    	fseeko(File, -0x200, SEEK_END); 
+		fseeko(File, -0x200, SEEK_END); 
 		fread(&kolyblock, 0x200, 1, File);
 		errno = 0; 
-    	kolyblock = parseKOLYBLOCK(kolyblock); 
+		kolyblock = parseKOLYBLOCK(kolyblock); 
 		if (errno == EINVAL) {std::cout << "rip\n"; return -1;}
 	}
 	if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
-        char* plist = (char *)malloc(kolyblock.RsrcForkLength);
-        fseeko(File, kolyblock.RsrcForkOffset, SEEK_END); 
-        fread(plist, kolyblock.RsrcForkLength, 1, File); 
-        struct _mishblk mishblk; 
-        int next_mishblk = 0; 
-        char *mish_begin = plist + 0x104; 
-        while (true) {
-            mish_begin += next_mishblk; 
-            if (mish_begin - plist + 0xCC > kolyblock.RsrcForkLength) {break; } 
+		char* plist = (char *)malloc(kolyblock.RsrcForkLength);
+		fseeko(File, kolyblock.RsrcForkOffset, SEEK_END); 
+		fread(plist, kolyblock.RsrcForkLength, 1, File); 
+		struct _mishblk mishblk; 
+		int next_mishblk = 0; 
+		char *mish_begin = plist + 0x104; 
+		while (true) {
+			mish_begin += next_mishblk; 
+			if (mish_begin - plist + 0xCC > kolyblock.RsrcForkLength) {break; } 
 			memcpy(&mishblk, 0, 0xD8);
 			memcpy(&mishblk, mish_begin, 0xCC);
-            mishblk = parseMISHBLOCK(mishblk);
-            next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
-            i = ++partnum;  
-            struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
+			mishblk = parseMISHBLOCK(mishblk);
+			next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
+			i = ++partnum;  
+			struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
 			if (!parts) {return -1;}
-            memcpy(&parts[i], &mishblk, 0xD8);
+			memcpy(&parts[i], &mishblk, 0xD8);
 			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
-            memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
-        }
-    }
-    else if (kolyblock.XMLOffset && kolyblock.XMLLength) {
+			memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
+		}
+	}
+	else if (kolyblock.XMLOffset && kolyblock.XMLLength) {
 		plist = (char *)malloc(kolyblock.XMLLength);
-        fseeko(File, kolyblock.XMLOffset, SEEK_SET);
-        fread(plist, kolyblock.XMLLength, 1, File);
-        char *_blkx_begin = strstr(plist, "<key>blkx</key>");
-        unsigned int blkx_size = strstr(_blkx_begin, "</array>") - _blkx_begin;
+		fseeko(File, kolyblock.XMLOffset, SEEK_SET);
+		fread(plist, kolyblock.XMLLength, 1, File);
+		char *_blkx_begin = strstr(plist, "<key>blkx</key>");
+		unsigned int blkx_size = strstr(_blkx_begin, "</array>") - _blkx_begin;
 		blkx = (char *)malloc(blkx_size);
-        memcpy(blkx, _blkx_begin, blkx_size);
+		memcpy(blkx, _blkx_begin, blkx_size);
 		data_begin = blkx; 
-        while (true) {
-            unsigned int tmplen; 
-            data_begin = strstr(data_begin, "<data>");
-            if (!data_begin) {break; }
+		while (true) {
+			unsigned int tmplen; 
+			data_begin = strstr(data_begin, "<data>");
+			if (!data_begin) {break; }
 			data_begin += 6;
 			data_end = strstr(data_begin, "</data>");
 			if (!data_end) {break; }
@@ -106,16 +106,16 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 			i = ++partnum;
 			parts = (struct _mishblk *)realloc(parts, (partnum + 1) * 0xD8);
 			if (!parts) {return -1; }
-            char *base64data = (char *)malloc(data_size);
-            memcpy(base64data, data_begin, data_size);
-            cleanup_base64(base64data, data_size); 
-            decode_base64(base64data, strlen(base64data), base64data, &tmplen);
+			char *base64data = (char *)malloc(data_size);
+			memcpy(base64data, data_begin, data_size);
+			cleanup_base64(base64data, data_size); 
+			decode_base64(base64data, strlen(base64data), base64data, &tmplen);
 			memset(&parts[i], 0, 0xD8);
 			memcpy(&parts[i], base64data, 0xCC);
-            parts[i] = parseMISHBLOCK(parts[i]);
-            parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
-            memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
-            free(base64data); 
+			parts[i] = parseMISHBLOCK(parts[i]);
+			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
+			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
+			free(base64data); 
 			partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
 			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
 			partname_begin = strstr(partname_begin, "<string>");
@@ -123,9 +123,9 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 			char partname[partname_end - partname_begin]; 
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
 			if (strstr(partname, "HFS")) {extractPart = i;}
-        }
-    }
-    else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
+		}
+	}
+	else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
 
 	if (!extractPart) {std::cout << "No HFS partitions, will not mount!\n"; mountable = false;}; 
 	unsigned int block_type, offset; 
@@ -218,7 +218,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						to_write = fread(tmp, 1, chunk, File);
-						int bytes_written;      
+						int bytes_written;	  
 						int read_from_input = adc_decompress(to_write, tmp, CHUNKSIZE, dtmp, &bytes_written);
 						fwrite(dtmp, 1, bytes_written, Output);
 						to_read -= read_from_input;
@@ -256,7 +256,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 		}
 		if (extractPart) {break; }
 	}
-    
+
 	#define del(x) if(x) {free(x);}
 
 	del(lzfse_out);

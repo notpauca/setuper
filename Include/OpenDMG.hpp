@@ -14,17 +14,17 @@
 #define DECODESIZE 0x100000
 
 struct _Kolyblck {
-    uint32_t Signature, Version, HeaderSize, Flags; 
-    uint64_t RunningDataForkOffset, DataForkOffset, DataForkLength, RsrcForkOffset, RsrcForkLength;
-    uint32_t SegmentNumber, SegmentCount, SegmentID1, SegmentID2, segmentID3, SegmentID4, DataForkChecksumType, Reserved1, DataForkChecksum, Reserved2;
-    char Reserved3[120];
-    uint64_t XMLOffset, XMLLength; 
-    char Reserved4[120];
-    uint32_t MasterChecksumType, Reserved5, MasterChecksum, Reserved6;
-    char Reserved7[120];
-    uint32_t ImageVariant;
-    uint64_t SectorCount;
-    char Reserved8[12];
+	uint32_t Signature, Version, HeaderSize, Flags; 
+	uint64_t RunningDataForkOffset, DataForkOffset, DataForkLength, RsrcForkOffset, RsrcForkLength;
+	uint32_t SegmentNumber, SegmentCount, SegmentID1, SegmentID2, segmentID3, SegmentID4, DataForkChecksumType, Reserved1, DataForkChecksum, Reserved2;
+	char Reserved3[120];
+	uint64_t XMLOffset, XMLLength; 
+	char Reserved4[120];
+	uint32_t MasterChecksumType, Reserved5, MasterChecksum, Reserved6;
+	char Reserved7[120];
+	uint32_t ImageVariant;
+	uint64_t SectorCount;
+	char Reserved8[12];
 }; 
 
 struct _mishblk {
