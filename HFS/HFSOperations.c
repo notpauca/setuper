@@ -105,15 +105,15 @@ static int hfsfuse_opendir(const char* path, struct fuse_file_info* info) {
 
 	hfs_catalog_keyed_record_t link;
 	for(hfs_catalog_keyed_record_t* record = d->keys; record != d->keys + d->npaths; record++)
-		if(record->type == HFS_REC_FILE && (
-			(record->file.user_info.file_creator == HFS_HFSPLUS_CREATOR &&
-			record->file.user_info.file_type == HFS_HARD_LINK_FILE_TYPE &&
-			!hfslib_get_hardlink(vol, record->file.bsd.special.inode_num, &link, NULL)) ||
-			(record->file.user_info.file_creator == HFS_MACS_CREATOR &&
-			record->file.user_info.file_type == HFS_DIR_HARD_LINK_FILE_TYPE &&
-			!hfslib_get_directory_hardlink(vol, record->file.bsd.special.inode_num, &link, NULL))))
+		if (record->type == HFS_REC_FILE && (
+		(record->file.user_info.file_creator == HFS_HFSPLUS_CREATOR &&
+		record->file.user_info.file_type == HFS_HARD_LINK_FILE_TYPE &&
+		!hfslib_get_hardlink(vol, record->file.bsd.special.inode_num, &link, NULL)) ||
+		(record->file.user_info.file_creator == HFS_MACS_CREATOR &&
+		record->file.user_info.file_type == HFS_DIR_HARD_LINK_FILE_TYPE &&
+		!hfslib_get_directory_hardlink(vol, record->file.bsd.special.inode_num, &link, NULL)))) {
 			*record = link;
-
+		}
 	info->fh = (uint64_t)d;
 	return 0;
 }
