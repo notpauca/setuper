@@ -41,7 +41,7 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 	return input; 
 }
 
-int readDMG(FILE* File, FILE* Output, int &mountable) {
+int readDMG(FILE* File, FILE* Output, MountType &type) {
 	char *plist, *blkx, *data_end, *data_begin, *partname_begin, *partname_end; 
 	Bytef *tmp, *otmp, *dtmp; 
 	int partnum = 0, i = 0, extractPart = 0; 
@@ -49,7 +49,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 	z_stream z;
 	bz_stream bz; 
 	struct _mishblk *parts = NULL;
-	uint64_t out_size, in_offs, in_size, in_offs_add, add_offs, to_read, to_write, chunk;
+	uint64_t SectorCount, CompressedOffset, CompressedLength, in_offs_add, add_offs, to_read, to_write, chunk;
 	_Kolyblck kolyblock; 
 	size_t lzfse_outsize = 4 * CHUNKSIZE;
 	uint8_t *lzfse_out = NULL;
@@ -116,20 +116,28 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
 			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
 			free(base64data); 
-			partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
-			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
-			partname_begin = strstr(partname_begin, "<string>");
-			partname_end = strstr(partname_begin, "</string>"); 
-			char partname[partname_end - partname_begin]; 
-			memcpy(partname, partname_begin, partname_end - partname_begin); 
-			if (strstr(partname, "HFS")) {extractPart = i;}
+			if (!type) {
+				partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
+				partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
+				partname_begin = strstr(partname_begin, "<string>");
+				partname_end = strstr(partname_begin, "</string>"); 
+				char partname[partname_end - partname_begin]; 
+				memcpy(partname, partname_begin, partname_end - partname_begin); 
+				if (strstr(partname, "HFS")) {
+					extractPart = i; 
+					type = hfs; 
+				}
+				else if (strstr(partname, "APFS")) {
+					extractPart = i; 
+					type = apfs; 
+				}
+			}
 		}
 	}
 	else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
 
-	if (!extractPart) {std::cout << "No HFS partitions, will not mount!\n"; mountable = false;}; 
-	unsigned int block_type, offset; 
-	in_offs = in_offs_add = kolyblock.DataForkOffset; 
+	unsigned int EntryType, offset; 
+	CompressedOffset = in_offs_add = kolyblock.DataForkOffset; 
 	tmp = (Bytef *)malloc(CHUNKSIZE);
 	otmp = (Bytef *)malloc(CHUNKSIZE);
 	dtmp = (Bytef *)malloc(CHUNKSIZE);
@@ -141,22 +149,22 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 	bz.opaque = NULL;
 	int err; 
 	lzfse_out = (uint8_t *)malloc(lzfse_outsize);
-	for (i = 0; i < partnum && in_offs <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
+	for (i = 0; i < partnum && CompressedOffset <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
 		if (extractPart) {i = extractPart; }
-		offset = block_type = 0; 
+		offset = EntryType = 0; 
 		add_offs = in_offs_add; 
-		while (block_type != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
-			block_type = convert_char4((unsigned char *)parts[i].Data + offset);
-			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
-			in_offs = convert_char8((unsigned char *)parts[i].Data + offset + 24);
-			in_size = convert_char8((unsigned char *)parts[i].Data + offset + 32);
-			in_offs_add = add_offs + in_offs + in_size;
-			switch (block_type) {
+		while (EntryType != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
+			EntryType = convert_char4((unsigned char *)parts[i].Data + offset);
+			SectorCount = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
+			CompressedOffset  = convert_char8((unsigned char *)parts[i].Data + offset + 24);
+			CompressedLength = convert_char8((unsigned char *)parts[i].Data + offset + 32);
+			in_offs_add = add_offs + CompressedOffset + CompressedLength;
+			switch (EntryType) {
 				case 0x80000005: //zlib
 					inflateInit(&z);
-					fseeko(File, in_offs + add_offs, SEEK_SET);
-					to_read = in_size;
+					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
+					to_read = CompressedLength;
 					do {
 						if (!to_read) {break; }
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
@@ -177,8 +185,8 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					break; 
 				case 0x80000006: //bzlib2
 					BZ2_bzDecompressInit(&bz, 0, 0);
-					fseeko(File, in_offs + add_offs, SEEK_SET);
-					to_read = in_size;
+					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
+					to_read = CompressedLength;
 					do {
 						if (!to_read) {break; }
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
@@ -198,7 +206,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					break; 
 
 				case 0x80000007: //LZFSE
-					fseeko(File, in_offs + add_offs, SEEK_SET);
+					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = fread(tmp, 1, to_read, File);
 					if (to_read) {
 						while (true) {
@@ -213,8 +221,8 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					}
 					break; 
 				case 0x80000004: //ADC
-					fseeko(File, in_offs + add_offs, SEEK_SET);
-					to_read = in_size;
+					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
+					to_read = CompressedLength;
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						to_write = fread(tmp, 1, chunk, File);
@@ -225,8 +233,8 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					}
 					break; 
 				case 0x00000001: //uncompressed
-					fseeko(File, in_offs + add_offs, SEEK_SET);
-					to_read = in_size;
+					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
+					to_read = CompressedLength;
 					while (to_read) {
 						chunk = to_read > CHUNKSIZE ? CHUNKSIZE : to_read;
 						fread(tmp, 1, chunk, File);
@@ -236,7 +244,7 @@ int readDMG(FILE* File, FILE* Output, int &mountable) {
 					break; 
 				case 0x00000000: case 0x00000002: //ignore
 					memset(tmp, 0, CHUNKSIZE);
-					to_write = out_size;
+					to_write = SectorCount;
 					while (to_write) {
 						chunk = to_write > CHUNKSIZE ? CHUNKSIZE : to_write; 
 						if (fwrite(tmp, 1, chunk, Output) != chunk) {return -1; }

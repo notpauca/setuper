@@ -13,6 +13,12 @@
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
 
+enum MountType{
+	none,
+	hfs, 
+	apfs
+};
+
 struct _Kolyblck {
 	uint32_t Signature, Version, HeaderSize, Flags; 
 	uint64_t RunningDataForkOffset, DataForkOffset, DataForkLength, RsrcForkOffset, RsrcForkLength;
@@ -41,4 +47,4 @@ struct _mishblk {
 
 _mishblk parseMISHBLOCK(_mishblk input); 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input); 
-int readDMG(FILE* File, FILE* Output, int &mountable);  
+int readDMG(FILE* File, FILE* Output, MountType &type);  
