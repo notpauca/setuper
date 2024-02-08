@@ -49,7 +49,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 	z_stream z;
 	bz_stream bz; 
 	struct _mishblk *parts = NULL;
-	uint64_t SectorCount, CompressedOffset, CompressedLength, in_offs_add, add_offs, to_read, to_write, chunk;
+	uint64_t out_size, CompressedOffset, CompressedLength, in_offs_add, add_offs, to_read, to_write, chunk;
 	_Kolyblck kolyblock; 
 	size_t lzfse_outsize = 4 * CHUNKSIZE;
 	uint8_t *lzfse_out = NULL;
@@ -116,13 +116,13 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
 			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
 			free(base64data); 
-			if (!type) {
-				partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
-				partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
-				partname_begin = strstr(partname_begin, "<string>");
-				partname_end = strstr(partname_begin, "</string>"); 
-				char partname[partname_end - partname_begin]; 
-				memcpy(partname, partname_begin, partname_end - partname_begin); 
+			partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
+			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
+			partname_begin = strstr(partname_begin, "<string>");
+			partname_end = strstr(partname_begin, "</string>"); 
+			char partname[partname_end - partname_begin]; 
+			memcpy(partname, partname_begin, partname_end - partname_begin); 
+			if (type==none) {
 				if (strstr(partname, "HFS")) {
 					extractPart = i; 
 					type = hfs; 
@@ -136,6 +136,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 	}
 	else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
 
+	if (!extractPart) {std::cout << "not ok\n"; type = none;}; 
 	unsigned int EntryType, offset; 
 	CompressedOffset = in_offs_add = kolyblock.DataForkOffset; 
 	tmp = (Bytef *)malloc(CHUNKSIZE);
@@ -156,7 +157,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		add_offs = in_offs_add; 
 		while (EntryType != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
 			EntryType = convert_char4((unsigned char *)parts[i].Data + offset);
-			SectorCount = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
+			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
 			CompressedOffset  = convert_char8((unsigned char *)parts[i].Data + offset + 24);
 			CompressedLength = convert_char8((unsigned char *)parts[i].Data + offset + 32);
 			in_offs_add = add_offs + CompressedOffset + CompressedLength;
@@ -204,7 +205,6 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 					} while (err != BZ_STREAM_END);
 					BZ2_bzDecompressEnd(&bz);
 					break; 
-
 				case 0x80000007: //LZFSE
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = fread(tmp, 1, to_read, File);
@@ -244,16 +244,18 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 					break; 
 				case 0x00000000: case 0x00000002: //ignore
 					memset(tmp, 0, CHUNKSIZE);
-					to_write = SectorCount;
+					to_write = out_size;
 					while (to_write) {
 						chunk = to_write > CHUNKSIZE ? CHUNKSIZE : to_write; 
 						if (fwrite(tmp, 1, chunk, Output) != chunk) {return -1; }
 						to_write -= chunk;
 					}
 					break; 
-				case 0xFFFFFFFF: //pēdējais bloks§
-					if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {
-						in_offs_add = kolyblock.DataForkOffset;
+				case 0xFFFFFFFF: //pēdējais bloks
+					if (!CompressedOffset && partnum > i+1) {
+						if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {
+							in_offs_add = kolyblock.DataForkOffset;
+						}
 					}
 					else {
 						in_offs_add = kolyblock.DataForkOffset;
