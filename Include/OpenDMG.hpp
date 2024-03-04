@@ -63,8 +63,8 @@ struct _mishblk_data {
 #define ignore_2 0x00000002
 #define last 0xFFFFFFFF 
 
-_mishblk_data parseMISHBLOCK_DATA(_mishblk_data input); 
 _mishblk parseMISHBLOCK(_mishblk input); 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input); 
+_mishblk_data parseSectorInfo(char* input); 
 
 int readDMG(FILE* File, FILE* Output, MountType &type);  
