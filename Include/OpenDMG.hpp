@@ -42,9 +42,29 @@ struct _mishblk {
 	uint32_t ChecksumType, Reserved2, Checksum, Reserved3;
 	char Reserved4[120];
 	uint32_t BlocksRunCount;
-	char *Data;
+	char* Data;
 }; 
 
+struct _mishblk_data {
+	uint32_t EntryType;         // Compression type used or entry type (see next table)
+	uint32_t Comment;           // "+beg" or "+end", if EntryType is comment (0x7FFFFFFE). Else reserved.
+	uint64_t SectorNumber;      // Start sector of this chunk
+	uint64_t SectorCount;       // Number of sectors in this chunk
+	uint64_t CompressedOffset;  // Start of chunk in data fork
+	uint64_t CompressedLength;  
+};
+
+#define zlib 0x80000005
+#define bzlib2 0x80000006
+#define lzfse 0x80000007
+#define adc 0x80000004
+#define uncompressed 0x00000001
+#define ignore_1 0x00000000
+#define ignore_2 0x00000002
+#define last 0xFFFFFFFF 
+
+_mishblk_data parseMISHBLOCK_DATA(_mishblk_data input); 
 _mishblk parseMISHBLOCK(_mishblk input); 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input); 
+
 int readDMG(FILE* File, FILE* Output, MountType &type);  

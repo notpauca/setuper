@@ -7,7 +7,7 @@ FUSEFLAGS = -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64 -DHAVE_OSBYTEORDER_H -D
 build: 
 	mkdir bin
 	mkdir lib
-	$(CCompiler) $(FLAGS) $(FUSEFLAGS) HFS/HFSOperations.c -c
+	$(CCompiler) $(FLAGS) $(FUSEFLAGS) filesystems/HFSOperations.c -c
 	$(Compiler) $(FLAGS) DMGConverting/*.cpp -c
 	$(Compiler) $(FLAGS) $(FUSEFLAGS) src/setuper.cpp -c
 	mv *.o lib/

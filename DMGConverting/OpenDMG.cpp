@@ -42,7 +42,7 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 }
 
 int readDMG(FILE* File, FILE* Output, MountType &type) {
-	char *plist, *blkx, *data_end, *data_begin, *partname_begin, *partname_end; 
+	char *plist, *data_end, *data_begin, *partname_begin, *partname_end; 
 	Bytef *tmp, *otmp, *dtmp; 
 	int partnum = 0, i = 0, extractPart = 0; 
 	unsigned int data_size = 0; 
@@ -62,7 +62,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		fread(&kolyblock, 0x200, 1, File);
 		errno = 0; 
 		kolyblock = parseKOLYBLOCK(kolyblock); 
-		if (errno == EINVAL) {std::cout << "rip\n"; return -1;}
+		if (errno == EINVAL) {std::cout << "rip\n"; goto exit; return -1;}
 	}
 	if (kolyblock.RsrcForkOffset && kolyblock.RsrcForkLength) {
 		char* plist = (char *)malloc(kolyblock.RsrcForkLength);
@@ -80,7 +80,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
 			i = ++partnum;  
 			struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
-			if (!parts) {return -1;}
+			if (!parts) {goto exit; return -1;}
 			memcpy(&parts[i], &mishblk, 0xD8);
 			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
 			memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
@@ -90,11 +90,10 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		plist = (char *)malloc(kolyblock.XMLLength);
 		fseeko(File, kolyblock.XMLOffset, SEEK_SET);
 		fread(plist, kolyblock.XMLLength, 1, File);
-		char *_blkx_begin = strstr(plist, "<key>blkx</key>");
+		char *_blkx_begin = strstr(plist, "<key>blkx</key>") + 15;
 		unsigned int blkx_size = strstr(_blkx_begin, "</array>") - _blkx_begin;
-		blkx = (char *)malloc(blkx_size);
-		memcpy(blkx, _blkx_begin, blkx_size);
-		data_begin = blkx; 
+		data_begin = (char *)malloc(blkx_size);
+		memcpy(data_begin, _blkx_begin, blkx_size);
 		while (true) {
 			unsigned int tmplen; 
 			data_begin = strstr(data_begin, "<data>");
@@ -105,7 +104,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			data_size = data_end - data_begin;
 			i = ++partnum;
 			parts = (struct _mishblk *)realloc(parts, (partnum + 1) * 0xD8);
-			if (!parts) {return -1; }
+			if (!parts) {goto exit; return -1; }
 			char *base64data = (char *)malloc(data_size);
 			memcpy(base64data, data_begin, data_size);
 			cleanup_base64(base64data, data_size); 
@@ -116,12 +115,11 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
 			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
 			free(base64data); 
-			partname_begin = strstr(data_begin, "<key>Name</key>");						// partition names
-			partname_begin = strstr(partname_begin, "<key>Name</key>") + 16;
-			partname_begin = strstr(partname_begin, "<string>");
-			partname_end = strstr(partname_begin, "</string>"); 
-			char partname[partname_end - partname_begin]; 
+			partname_begin = strstr(data_begin, "<key>Name</key>") + 28;						// partition names
+			partname_end = strstr(partname_begin, "<"); 
+			char* partname = (char*)malloc(partname_end - partname_begin);
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
+			std::cout << partname << "\n";
 			if (type==none) {
 				if (strstr(partname, "HFS")) {
 					extractPart = i; 
@@ -134,7 +132,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			}
 		}
 	}
-	else {std::cout << "File doesn't have a kolyblock\n"; return -1;}
+	else {std::cout << "File doesn't have a kolyblock\n"; goto exit; return -1;}
 
 	if (!extractPart) {std::cout << "not ok\n"; type = none;}; 
 	unsigned int EntryType, offset; 
@@ -142,6 +140,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 	tmp = (Bytef *)malloc(CHUNKSIZE);
 	otmp = (Bytef *)malloc(CHUNKSIZE);
 	dtmp = (Bytef *)malloc(CHUNKSIZE);
+	lzfse_out = (uint8_t *)malloc(lzfse_outsize);
 	z.zalloc = (alloc_func) 0;
 	z.zfree = (free_func) 0;
 	z.opaque = (voidpf) 0;
@@ -149,20 +148,19 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 	bz.bzfree = NULL;
 	bz.opaque = NULL;
 	int err; 
-	lzfse_out = (uint8_t *)malloc(lzfse_outsize);
 	for (i = 0; i < partnum && CompressedOffset <= kolyblock.DataForkLength-kolyblock.DataForkOffset; i++) {
 		fflush(stdout); 
 		if (extractPart) {i = extractPart; }
 		offset = EntryType = 0; 
 		add_offs = in_offs_add; 
-		while (EntryType != 0xFFFFFFFF && offset < parts[i].BlocksRunCount * 40) {
+		while (EntryType != last && offset < parts[i].BlocksRunCount * 40) {
 			EntryType = convert_char4((unsigned char *)parts[i].Data + offset);
 			out_size = convert_char8((unsigned char *)parts[i].Data + offset + 16) * 0x200;
 			CompressedOffset  = convert_char8((unsigned char *)parts[i].Data + offset + 24);
 			CompressedLength = convert_char8((unsigned char *)parts[i].Data + offset + 32);
 			in_offs_add = add_offs + CompressedOffset + CompressedLength;
 			switch (EntryType) {
-				case 0x80000005: //zlib
+				case zlib:
 					inflateInit(&z);
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = CompressedLength;
@@ -177,14 +175,14 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 							z.avail_out = CHUNKSIZE;
 							z.next_out = otmp;
 							err = inflate(&z, Z_NO_FLUSH);
-							if (err == Z_MEM_ERROR) {return -1; }
+							if (err == Z_MEM_ERROR) {goto exit; return -1; }
 							to_write = CHUNKSIZE - z.avail_out;
 							fwrite(otmp, 1, to_write, Output); 
 						} while (!z.avail_out);
 					} while (err != Z_STREAM_END);
 					inflateEnd(&z);
 					break; 
-				case 0x80000006: //bzlib2
+				case bzlib2: //bzlib2
 					BZ2_bzDecompressInit(&bz, 0, 0);
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = CompressedLength;
@@ -205,12 +203,13 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 					} while (err != BZ_STREAM_END);
 					BZ2_bzDecompressEnd(&bz);
 					break; 
-				case 0x80000007: //LZFSE
+				case lzfse: //LZFSE
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
-					to_read = fread(tmp, 1, to_read, File);
-					if (to_read) {
+					if (CompressedLength) {
+						to_read = fread(tmp, 1, to_read > CHUNKSIZE ? CHUNKSIZE : CompressedLength, File);
 						while (true) {
-							to_write = lzfse_decode_buffer(lzfse_out, lzfse_outsize, tmp, to_read, nullptr);
+							to_write = lzfse_decode_buffer(lzfse_out, lzfse_outsize, tmp, to_read, NULL);
+							if (!to_write) {std::cout << "LZFSE neiet!\n";}
 							if (to_write == lzfse_outsize) {
 								lzfse_outsize <<= 1;
 								lzfse_out = (uint8_t *) realloc(lzfse_out, lzfse_outsize);
@@ -220,7 +219,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 						fwrite(lzfse_out, 1, to_write, Output); 
 					}
 					break; 
-				case 0x80000004: //ADC
+				case adc: //ADC
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = CompressedLength;
 					while (to_read) {
@@ -232,7 +231,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 						to_read -= read_from_input;
 					}
 					break; 
-				case 0x00000001: //uncompressed
+				case uncompressed: //uncompressed
 					fseeko(File, CompressedOffset + add_offs, SEEK_SET);
 					to_read = CompressedLength;
 					while (to_read) {
@@ -242,16 +241,16 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 						to_read -= chunk;
 					}
 					break; 
-				case 0x00000000: case 0x00000002: //ignore
+				case ignore_1: case ignore_2: //ignore
 					memset(tmp, 0, CHUNKSIZE);
 					to_write = out_size;
 					while (to_write) {
 						chunk = to_write > CHUNKSIZE ? CHUNKSIZE : to_write; 
-						if (fwrite(tmp, 1, chunk, Output) != chunk) {return -1; }
+						if (fwrite(tmp, 1, chunk, Output) != chunk) {goto exit; return -1; }
 						to_write -= chunk;
 					}
 					break; 
-				case 0xFFFFFFFF: //pēdējais bloks
+				case last: //pēdējais bloks
 					if (!CompressedOffset && partnum > i+1) {
 						if (convert_char8((unsigned char *)parts[i+1].Data + 24)) {
 							in_offs_add = kolyblock.DataForkOffset;
@@ -266,22 +265,21 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		}
 		if (extractPart) {break; }
 	}
-
-	#define del(x) if(x) {free(x);}
-
-	del(lzfse_out);
-	del(tmp); 
-	del(otmp); 
-	del(dtmp); 
-	for (int i = 0; i < partnum; i++) {
-		del(parts[i].Data); 
-	}
-	del(parts); 
-	del(plist); 
-	del(blkx); 
-	if (File)
-		fclose(File);
-	if (Output)
-		fclose(Output);	
+	goto exit; 
 	return 0; 
+	exit: 
+		#define del(x) if(x) {free(x);}
+		del(lzfse_out);
+		del(tmp); 
+		del(otmp); 
+		del(dtmp); 
+		for (int i = 0; i < partnum; i++) {
+			del(parts[i].Data); 
+		}
+		del(parts); 
+		del(plist); 
+		if (File)
+			fclose(File);
+		if (Output)
+			fclose(Output);	
 }
