@@ -13,7 +13,9 @@
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
 
-enum MountType{
+#define BLOCKCHUNKENTRYSIZE 0x28
+
+enum MountType {
 	none,
 	hfs, 
 	apfs
@@ -22,15 +24,13 @@ enum MountType{
 struct _Kolyblck {
 	uint32_t Signature, Version, HeaderSize, Flags; 
 	uint64_t RunningDataForkOffset, DataForkOffset, DataForkLength, RsrcForkOffset, RsrcForkLength;
-	uint32_t SegmentNumber, SegmentCount, SegmentID1, SegmentID2, segmentID3, SegmentID4, DataForkChecksumType, Reserved1, DataForkChecksum, Reserved2;
-	char Reserved3[120];
+	uint32_t SegmentNumber, SegmentCount, SegmentID[4], DataForkChecksumType, DataForkChecksumBits, DataForkChecksum[32];
 	uint64_t XMLOffset, XMLLength; 
-	char Reserved4[120];
-	uint32_t MasterChecksumType, Reserved5, MasterChecksum, Reserved6;
-	char Reserved7[120];
+	char Reserved1[120];
+	uint32_t MasterChecksumType, MasterChecksumBits, MasterChecksum[32];
 	uint32_t ImageVariant;
 	uint64_t SectorCount;
-	char Reserved8[12];
+	uint32_t Reserved2[3];
 }; 
 
 struct _mishblk {
@@ -38,9 +38,8 @@ struct _mishblk {
 	uint64_t FirstSectorNumber, SectorCount;
 	uint64_t DataStart;
 	uint32_t DecompressedBufferRequested, BlocksDescriptor;
-	char Reserved1[24];
-	uint32_t ChecksumType, Reserved2, Checksum, Reserved3;
-	char Reserved4[120];
+	char Reserved[24];
+	uint32_t ChecksumType, ChecksumBits, Checksum[32];
 	uint32_t BlocksRunCount;
 	char* Data;
 }; 

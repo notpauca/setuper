@@ -10,8 +10,8 @@ _mishblk parseMISHBLOCK(_mishblk input) {
 	// input.DataStart = convert_int64(input.DataStart);
 	// input.DecompressedBufferRequested = convert_int(input.DecompressedBufferRequested);
 	// input.BlocksDescriptor = convert_int(input.BlocksDescriptor);
-	// input.ChecksumType = convert_int(input.ChecksumType);
-	// input.Checksum = convert_int(input.Checksum);
+	input.ChecksumType = convert_int(input.ChecksumType); 
+	input.ChecksumBits = convert_int(input.ChecksumBits);
 	input.BlocksRunCount = convert_int(input.BlocksRunCount);
 	return input; 
 }
@@ -30,12 +30,11 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 	input.RsrcForkLength = convert_int64(input.RsrcForkLength);
 	// input.SegmentNumber = convert_int(input.SegmentNumber);
 	// input.SegmentCount = convert_int(input.SegmentCount);
-	// input.DataForkChecksumType = convert_int(input.DataForkChecksumType);
-	// input.DataForkChecksum = convert_int(input.DataForkChecksum);
+	input.DataForkChecksumType = convert_int(input.DataForkChecksumType);
+	input.DataForkChecksumBits = convert_int(input.DataForkChecksumBits);
 	input.XMLOffset = convert_int64(input.XMLOffset);
 	input.XMLLength = convert_int64(input.XMLLength);
 	// input.MasterChecksumType = convert_int(input.MasterChecksumType);
-	// input.MasterChecksum = convert_int(input.MasterChecksum);
 	// input.ImageVariant = convert_int(input.ImageVariant);
 	// input.SectorCount = convert_int64(input.SectorCount);
 	return input; 
@@ -44,7 +43,7 @@ _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
 _mishblk_data parseSectorInfo(char* input) {
 	_mishblk_data output; 
 	output.EntryType = convert_char4((unsigned char*)input);
-	output.Comment = convert_char4((unsigned char*)input + 8);				//var ignorēt
+	// output.Comment = convert_char4((unsigned char*)input + 8);				//var ignorēt
 	output.SectorCount = convert_char8((unsigned char*)input + 16); 		//out_size, vajag reizināt ar 0x200
 	output.CompressedOffset = convert_char8((unsigned char*)input + 24);
 	output.CompressedLength = convert_char8((unsigned char*)input + 32);
@@ -53,14 +52,14 @@ _mishblk_data parseSectorInfo(char* input) {
 
 int readDMG(FILE* File, FILE* Output, MountType &type) {
 	char *plist, *data_end, *data_begin, *partname_begin, *partname_end; 
-	char *sector_data_buffer = (char*)malloc(0x28); 
+	char *sector_data_buffer = (char*)malloc(BLOCKCHUNKENTRYSIZE); 
 	Bytef *tmp, *otmp, *dtmp; 
 	int partnum = 0, i = 0, extractPart = 0; 
 	unsigned int data_size = 0; 
 	z_stream z;
 	bz_stream bz; 
 	struct _mishblk *parts = NULL;
-	uint64_t out_size, in_offs_add, add_offs, to_read, to_write, chunk;
+	uint64_t in_offs_add, add_offs, to_read, to_write, chunk;
 	_Kolyblck kolyblock; 
 	size_t lzfse_outsize = 4 * CHUNKSIZE;
 	uint8_t *lzfse_out = NULL;
@@ -79,7 +78,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		char* plist = (char *)malloc(kolyblock.RsrcForkLength);
 		fseeko(File, kolyblock.RsrcForkOffset, SEEK_END); 
 		fread(plist, kolyblock.RsrcForkLength, 1, File); 
-		struct _mishblk mishblk; 
+		_mishblk mishblk; 
 		int next_mishblk = 0; 
 		char *mish_begin = plist + 0x104; 
 		while (true) {
@@ -88,13 +87,13 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			memcpy(&mishblk, 0, 0xD8);
 			memcpy(&mishblk, mish_begin, 0xCC);
 			mishblk = parseMISHBLOCK(mishblk);
-			next_mishblk = 0xD0 + 0x28 * mishblk.BlocksRunCount;
+			next_mishblk = 0xD0 + BLOCKCHUNKENTRYSIZE * mishblk.BlocksRunCount;
 			i = ++partnum;  
-			struct _mishblk *parts = (_mishblk *)realloc(parts, partnum * 0xD8);
+			parts = (_mishblk *)realloc(parts, partnum * 0xD8);
 			if (!parts) {goto exit; return -1;}
 			memcpy(&parts[i], &mishblk, 0xD8);
-			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * 0x28);
-			memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * 0x28);
+			parts[i].Data = (char *)malloc(mishblk.BlocksRunCount * BLOCKCHUNKENTRYSIZE);
+			memcpy(parts[i].Data, mish_begin + 0xCC, mishblk.BlocksRunCount * BLOCKCHUNKENTRYSIZE);
 		}
 	}
 	else if (kolyblock.XMLOffset && kolyblock.XMLLength) {
@@ -114,7 +113,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			if (!data_end) {break; }
 			data_size = data_end - data_begin;
 			i = ++partnum;
-			parts = (struct _mishblk *)realloc(parts, (partnum + 1) * 0xD8);
+			parts = (_mishblk *)realloc(parts, (partnum + 1) * 0xD8);
 			if (!parts) {goto exit; return -1; }
 			char *base64data = (char *)malloc(data_size);
 			memcpy(base64data, data_begin, data_size);
@@ -123,9 +122,22 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			memset(&parts[i], 0, 0xD8);
 			memcpy(&parts[i], base64data, 0xCC);
 			parts[i] = parseMISHBLOCK(parts[i]);
-			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * 0x28); 
-			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * 0x28);
+			parts[i].Data = (char *)malloc(parts[i].BlocksRunCount * BLOCKCHUNKENTRYSIZE); 
+			memcpy(parts[i].Data, base64data + 0xCC, parts[i].BlocksRunCount * BLOCKCHUNKENTRYSIZE);
 			free(base64data); 
+			switch (parts[i].ChecksumType) {													// checksums. If the type is 2, it's CRC32 (ChecksumBits must be 32). If the type's 0, there's no checksum. 
+				case 2: 																		// TODO: actual checksum comparison! 
+					if (parts[i].ChecksumBits != 32) {
+						goto exit; 
+						return -1; 
+					}
+					break; 
+				case 0: 
+					break; 
+				default: 
+					goto exit; 
+					return -1; 
+			}
 			partname_begin = strstr(data_begin, "<key>Name</key>") + 28;						// partition names
 			partname_end = strstr(partname_begin, "<"); 
 			char* partname = (char*)malloc(partname_end - partname_begin);
@@ -143,7 +155,11 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			free(partname); 
 		}
 	}
-	else {std::cout << "Nav kolybloka! Fails ir sabojāts, vai tam šis rīks nav nepieciešams!\n"; goto exit; return -1;}
+	else {
+		std::cerr << "Nav kolybloka! Fails ir sabojāts, vai tam šis rīks nav nepieciešams!\n"; 
+		goto exit; 
+		return -1;
+	}
 
 	if (!extractPart) {type = none;}
 	tmp = (Bytef *)malloc(CHUNKSIZE);
@@ -163,7 +179,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		fflush(stdout); 
 		add_offs = in_offs_add; 
 		for (int offset = 0; sector_data.EntryType != last && offset < parts[i].BlocksRunCount; offset++) {
-			memcpy(sector_data_buffer, parts[i].Data + (offset * 0x28), 0x28); 
+			memcpy(sector_data_buffer, parts[i].Data + (offset * BLOCKCHUNKENTRYSIZE), BLOCKCHUNKENTRYSIZE); 
 			sector_data = parseSectorInfo(sector_data_buffer);
 			in_offs_add = add_offs + sector_data.CompressedOffset + sector_data.CompressedLength;
 			switch (sector_data.EntryType) {
@@ -271,7 +287,6 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 		if (extractPart) {break; }
 	}
 	goto exit; 
-	return 0; 
 	exit: 
 		#define del(x) if(x) {free(x);}
 		del(lzfse_out);
@@ -289,4 +304,5 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 			fclose(File);
 		if (Output)
 			fclose(Output);	
+	return 0; 
 }
