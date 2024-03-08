@@ -1,15 +1,7 @@
 #include "OpenDMG.hpp"
 
 _mishblk parseMISHBLOCK(_mishblk input) {
-	// input.Signature = convert_int(input.Signature);
-	// if (input.Signature != 0x6D697368) {errno = EINVAL;}
 	if (input.Signature != 0x6873696D) {errno = EINVAL;}
-	// input.Version = convert_int(input.Version);
-	// input.FirstSectorNumber = convert_int64(input.FirstSectorNumber);
-	// input.SectorCount = convert_int64(input.SectorCount);
-	// input.DataStart = convert_int64(input.DataStart);
-	// input.DecompressedBufferRequested = convert_int(input.DecompressedBufferRequested);
-	// input.BlocksDescriptor = convert_int(input.BlocksDescriptor);
 	input.ChecksumType = convert_int(input.ChecksumType); 
 	input.ChecksumBits = convert_int(input.ChecksumBits);
 	input.BlocksRunCount = convert_int(input.BlocksRunCount);
@@ -17,26 +9,15 @@ _mishblk parseMISHBLOCK(_mishblk input) {
 }
 
 _Kolyblck parseKOLYBLOCK(_Kolyblck input) {
-	// input.Signature = convert_int(input.Signature);
-	// if(input.Signature != 0x6B6F6C79) {errno = EINVAL; }
 	if(input.Signature != 0x796C6F6B) {errno = EINVAL; }
-	// input.Version = convert_int(input.Version);
-	// input.HeaderSize = convert_int(input.HeaderSize);
-	// input.Flags = convert_int(input.Flags);
-	// input.RunningDataForkOffset = convert_int64(input.RunningDataForkOffset);
 	input.DataForkOffset = convert_int64(input.DataForkOffset);
 	input.DataForkLength = convert_int64(input.DataForkLength);
 	input.RsrcForkOffset = convert_int64(input.RsrcForkOffset);
 	input.RsrcForkLength = convert_int64(input.RsrcForkLength);
-	// input.SegmentNumber = convert_int(input.SegmentNumber);
-	// input.SegmentCount = convert_int(input.SegmentCount);
 	input.DataForkChecksumType = convert_int(input.DataForkChecksumType);
 	input.DataForkChecksumBits = convert_int(input.DataForkChecksumBits);
 	input.XMLOffset = convert_int64(input.XMLOffset);
 	input.XMLLength = convert_int64(input.XMLLength);
-	// input.MasterChecksumType = convert_int(input.MasterChecksumType);
-	// input.ImageVariant = convert_int(input.ImageVariant);
-	// input.SectorCount = convert_int64(input.SectorCount);
 	return input; 
 }
 
@@ -44,10 +25,34 @@ _mishblk_data parseSectorInfo(char* input) {
 	_mishblk_data output; 
 	output.EntryType = convert_char4((unsigned char*)input);
 	// output.Comment = convert_char4((unsigned char*)input + 8);				//var ignorēt
-	output.SectorCount = convert_char8((unsigned char*)input + 16); 		//out_size, vajag reizināt ar 0x200
+	output.SectorCount = convert_char8((unsigned char*)input + 16); 		//out_size, vajag reizināt ar SECTORSIZE
 	output.CompressedOffset = convert_char8((unsigned char*)input + 24);
 	output.CompressedLength = convert_char8((unsigned char*)input + 32);
 	return output; 
+}
+
+int convert_int(int i) {
+	char *p_i = (char *) &i;
+	std::swap(p_i[0], p_i[3]); 
+	std::swap(p_i[1], p_i[2]); 
+	return i;
+}
+
+uint64_t convert_int64(uint64_t i) {
+	char *p_i = (char *) &i;
+	std::swap(p_i[0], p_i[7]); 
+	std::swap(p_i[1], p_i[6]); 
+	std::swap(p_i[2], p_i[5]); 
+	std::swap(p_i[3], p_i[4]); 
+	return i;
+}
+
+uint32_t convert_char4(unsigned char *c) {
+	return (((uint32_t) c[0]) << 24) | (((uint32_t) c[1]) << 16) | (((uint32_t) c[2]) << 8) | ((uint32_t) c[3]);
+}
+
+uint64_t convert_char8(unsigned char *c) {
+	return ((uint64_t) convert_char4(c) << 32) | (convert_char4(c + 4));
 }
 
 int readDMG(FILE* File, FILE* Output, MountType &type) {
@@ -64,12 +69,12 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 	size_t lzfse_outsize = 4 * CHUNKSIZE;
 	uint8_t *lzfse_out = NULL;
 	fseeko(File, 0, SEEK_SET); 
-	fread(&kolyblock, 0x200, 1, File);
+	fread(&kolyblock, SECTORSIZE, 1, File);
 	errno = 0; 
 	kolyblock = parseKOLYBLOCK(kolyblock); 
 	if (errno == EINVAL) {
-		fseeko(File, -0x200, SEEK_END); 
-		fread(&kolyblock, 0x200, 1, File);
+		fseeko(File, -SECTORSIZE, SEEK_END); 
+		fread(&kolyblock, SECTORSIZE, 1, File);
 		errno = 0; 
 		kolyblock = parseKOLYBLOCK(kolyblock); 
 		if (errno == EINVAL) {goto exit; return -1;}
@@ -139,7 +144,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 					return -1; 
 			}
 			partname_begin = strstr(data_begin, "<key>Name</key>") + 28;						// partition names
-			partname_end = strstr(partname_begin, "<"); 
+			partname_end = strstr(partname_begin, "</string>"); 
 			char* partname = (char*)malloc(partname_end - partname_begin);
 			memcpy(partname, partname_begin, partname_end - partname_begin); 
 			if (type==none) {
@@ -265,7 +270,7 @@ int readDMG(FILE* File, FILE* Output, MountType &type) {
 					break; 
 				case ignore_1: case ignore_2: 
 					memset(tmp, 0, CHUNKSIZE);
-					to_write = sector_data.SectorCount * 0x200;
+					to_write = sector_data.SectorCount * SECTORSIZE;
 					while (to_write) {
 						chunk = to_write > CHUNKSIZE ? CHUNKSIZE : to_write; 
 						if (fwrite(tmp, 1, chunk, Output) != chunk) {goto exit; return -1; }

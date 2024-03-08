@@ -14,7 +14,7 @@ void cleanup_base64(char *inp, const unsigned int size) {
 unsigned char decode_base64_char(const char c) {
 	if (((unsigned)c - 'A') <= 25) {return c - 'A';}
 	if (((unsigned)c - 'a') <= 25) {return c - 'a' + 26;} 
-	if ((unsigned)(c - '0') <= 9) {return c - '0' + 52;}
+	if (((unsigned)c - '0') <= 9) {return c - '0' + 52;}
 	if (c == '+') {return 62;} 
 	if (c == '=') {return 0;} 
 	return 63;

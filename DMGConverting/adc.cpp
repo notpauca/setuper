@@ -91,7 +91,7 @@ int adc_chunk_offset(unsigned char *chunk_start) {
 		case 1:
 			return 0;
 		case 2:
-			return ((((unsigned char)*c & 0x03)) << 8) + (unsigned char)*(c + 1);
+			return ((((unsigned char)*c & 3)) << 8) + (unsigned char)*(c + 1);
 		case 3:
 			return (((unsigned char)*(c + 1)) << 8) + (unsigned char)*(c + 2);
 	}

@@ -37,7 +37,7 @@ int request(std::string Address, std::string outputName) {
 
 int makeDirectory(std::string directoryPath) {
 	errno = 0; 
-	mkdir(directoryPath.c_str(), 0777); 
+	mkdir(directoryPath.c_str(), S_IRWXU | S_IRWXG | S_IRWXO); 
 	switch (errno) {
 		case 17:
 		case 0: 
@@ -89,7 +89,7 @@ int main() {
 		if (readDMG(DMG, Output, PartType)) {std::cout << "can't convert the DMG file.\n"; continue;}
 		switch (PartType) {
 			case hfs: 
-				MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)ProgramList[i].name.c_str()); 
+				MountHFS((char*)extract.c_str(), (char*)MountPath.c_str(), (char*)(ProgramList[i].name.c_str())); 
 				break;
 			case apfs: 
 				std::cout << "APFS not supported yet\n"; 

@@ -4,22 +4,28 @@
 #include <bzlib.h>
 #include <lzfse.h>
 #include <iostream>
-#include <assert.h>
 #include "base64.hpp"
 #include "adc.hpp"
-#include "convert.hpp"
-
 
 #define CHUNKSIZE 0x100000
 #define DECODESIZE 0x100000
 
 #define BLOCKCHUNKENTRYSIZE 0x28
+#define SECTORSIZE 0x200
 
 enum MountType {
 	none,
 	hfs, 
 	apfs
 };
+
+int convert_int(int i);
+
+uint64_t convert_int64(uint64_t i);
+
+uint32_t convert_char4(unsigned char *c);
+
+uint64_t convert_char8(unsigned char *c);
 
 struct _Kolyblck {
 	uint32_t Signature, Version, HeaderSize, Flags; 
